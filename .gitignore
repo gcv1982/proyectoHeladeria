@@ -1,0 +1,39 @@
+# Dependencias
+node_modules/
+frontend/node_modules/
+backend/node_modules/
+
+# Variables de entorno (contienen contraseñas - NUNCA subir)
+backend/.env
+.env
+
+# Python virtual environments
+backend/.venv/
+backInventario/.venv/
+backInventario/backend/.venv/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Archivos de build del frontend
+frontend/build/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Archivos temporales del sistema operativo
+.DS_Store
+Thumbs.db
+
+# Archivos de datos temporales
+backend/ventas_hoy.json
+
+# IDE
+.vscode/
+*.swp
+
+# Archivos temporales de Claude
+tmpclaude-*
