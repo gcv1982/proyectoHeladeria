@@ -24,8 +24,16 @@ const DENOM_CONFIG = [
 const DENOM_INIT = { d20000:'', d10000:'', d2000:'', d1000:'', d500:'', d200:'', d100:'', d50:'', d20:'', d10:'' };
 const calcDenomTotal = (v) => DENOM_CONFIG.reduce((s, { key, mult }) => s + (Number(v[key])||0)*mult, 0);
 
-const DenomGrid = React.forwardRef(function DenomGrid({ prefix, gridClass, totalLabel, onTotalChange }, ref) {
-  const [vals, setVals] = useState(DENOM_INIT);
+const DenomGrid = React.forwardRef(function DenomGrid({ prefix, gridClass, totalLabel, onTotalChange, storageKey }, ref) {
+  const [vals, setVals] = useState(() => {
+    if (storageKey) {
+      try {
+        const saved = localStorage.getItem(storageKey);
+        if (saved) return { ...DENOM_INIT, ...JSON.parse(saved) };
+      } catch (e) { /* ignorar */ }
+    }
+    return DENOM_INIT;
+  });
   const total = calcDenomTotal(vals);
 
   useImperativeHandle(ref, () => ({
@@ -37,7 +45,11 @@ const DenomGrid = React.forwardRef(function DenomGrid({ prefix, gridClass, total
 
   const handleChange = (key) => (e) => {
     const v = e.target.value.replace(/[^0-9]/g, '');
-    setVals(prev => ({ ...prev, [key]: v }));
+    setVals(prev => {
+      const next = { ...prev, [key]: v };
+      if (storageKey) localStorage.setItem(storageKey, JSON.stringify(next));
+      return next;
+    });
   };
 
   return (
@@ -884,7 +896,8 @@ function AppInner() {
     localStorage.removeItem('inicioCaja');
     localStorage.removeItem('retiros');
     localStorage.removeItem('gastos');
-  
+    localStorage.removeItem('cierre-denominaciones');
+
 };
 
   return (
@@ -947,7 +960,7 @@ function AppInner() {
               <div className="cierre-layout">
                 <div className="cierre-conteo">
                   <h3>💵 Contar Efectivo en Caja</h3>
-                  <DenomGrid ref={denomCierreRef} key={cierreKey} prefix="cierre" gridClass="denominaciones-grid-cierre" totalLabel="Total Contado" onTotalChange={setCierreTotalContado} />
+                  <DenomGrid ref={denomCierreRef} key={cierreKey} prefix="cierre" gridClass="denominaciones-grid-cierre" totalLabel="Total Contado" onTotalChange={setCierreTotalContado} storageKey="cierre-denominaciones" />
                 </div>
                 <div className="cierre-resumen">
                   <h3>📊 Resumen del Día</h3>
