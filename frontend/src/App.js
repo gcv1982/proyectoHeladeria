@@ -44,10 +44,13 @@ const DenomGrid = React.forwardRef(function DenomGrid({ prefix, gridClass, total
   useEffect(() => { if (onTotalChange) onTotalChange(total); }, [total]); // eslint-disable-line
 
   const handleChange = (key) => (e) => {
-    const v = e.target.value.replace(/[^0-9]/g, '');
+    const raw = e.target.value;
+    const v = raw === '' ? '' : String(Math.max(0, parseInt(raw, 10) || 0));
     setVals(prev => {
       const next = { ...prev, [key]: v };
-      if (storageKey) localStorage.setItem(storageKey, JSON.stringify(next));
+      if (storageKey) {
+        try { localStorage.setItem(storageKey, JSON.stringify(next)); } catch (_) {}
+      }
       return next;
     });
   };
@@ -61,12 +64,12 @@ const DenomGrid = React.forwardRef(function DenomGrid({ prefix, gridClass, total
             <input
               id={`${prefix}-${key}`}
               name={`${prefix}-${key}`}
-              type="text"
-              inputMode="numeric"
-              pattern="[0-9]*"
+              type="number"
+              min="0"
+              step="1"
               value={vals[key]}
               onChange={handleChange(key)}
-              placeholder="Cantidad"
+              placeholder="0"
             />
             <span className="subtotal">${((Number(vals[key])||0)*mult).toLocaleString()}</span>
           </div>
@@ -203,7 +206,13 @@ function AppInner() {
   // Refs a los componentes DenomGrid (manejan su propio estado)
   const denomInicioRef = useRef();
   const denomCierreRef = useRef();
-  const [cierreTotalContado, setCierreTotalContado] = useState(0);
+  const [cierreTotalContado, setCierreTotalContado] = useState(() => {
+    try {
+      const saved = localStorage.getItem('cierre-denominaciones');
+      if (saved) return calcDenomTotal({ ...DENOM_INIT, ...JSON.parse(saved) });
+    } catch(e) {}
+    return 0;
+  });
   const [cierreKey, setCierreKey] = useState(0); // cambiar para resetear DenomGrid cierre
 
   const calcularTotalCierre = () => cierreTotalContado;

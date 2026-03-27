@@ -1890,6 +1890,13 @@
   white-space: nowrap;
 }
 
+.denominacion-item input[type="number"]::-webkit-inner-spin-button,
+.denominacion-item input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.denominacion-item input[type="number"] { -moz-appearance: textfield; }
+
 .denominacion-item input {
   flex: 0 0 56px;
   padding: 6px;
