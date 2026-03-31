@@ -195,6 +195,46 @@ exports.obtenerReporteVentas = async (req, res) => {
   }
 };
 
+// Modificar venta (solo admin/gerente — verificado en la ruta)
+exports.modificarVenta = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { items, total, pagos } = req.body;
+
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ error: 'items debe ser un array no vacío' });
+    }
+    if (!pagos || !Array.isArray(pagos) || pagos.length === 0) {
+      return res.status(400).json({ error: 'pagos debe ser un array no vacío' });
+    }
+    if (!total || total <= 0) {
+      return res.status(400).json({ error: 'total debe ser mayor a cero' });
+    }
+
+    const result = await db.query(
+      `UPDATE ventas SET items = $1, total = $2, pagos = $3,
+       descripcion = $4, updated_at = NOW()
+       WHERE id = $5`,
+      [
+        JSON.stringify(items),
+        total,
+        JSON.stringify(pagos),
+        `Venta modificada - ${items.length} productos`,
+        id
+      ]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: 'Venta no encontrada' });
+    }
+
+    res.json({ success: true, message: 'Venta modificada correctamente' });
+  } catch (error) {
+    console.error('Error al modificar venta:', error);
+    res.status(500).json({ error: 'Error al modificar venta', details: error.message });
+  }
+};
+
 // Cancelar venta
 exports.cancelarVenta = async (req, res) => {
   try {

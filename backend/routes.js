@@ -19,7 +19,8 @@ const {
     obtenerVentas,
     obtenerVentaPorId,
     obtenerReporteVentas,
-    cancelarVenta
+    cancelarVenta,
+    modificarVenta
 } = require('./controllers/ventas');
 
 // ========== AUTENTICACIÓN ==========
@@ -46,6 +47,9 @@ router.get('/ventas/:id', verificarToken, obtenerVentaPorId);
 
 // Obtener reporte de ventas
 router.get('/ventas-reporte', verificarToken, obtenerReporteVentas);
+
+// Modificar venta (solo admin/gerente)
+router.put('/ventas/:id', verificarToken, verificarRol(['admin', 'gerente']), modificarVenta);
 
 // Cancelar venta
 router.put('/ventas/:id/cancelar', verificarToken, cancelarVenta);
