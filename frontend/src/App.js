@@ -24,7 +24,7 @@ const DENOM_CONFIG = [
 const DENOM_INIT = { d20000:'', d10000:'', d2000:'', d1000:'', d500:'', d200:'', d100:'', d50:'', d20:'', d10:'' };
 const calcDenomTotal = (v) => DENOM_CONFIG.reduce((s, { key, mult }) => s + (Number(v[key])||0)*mult, 0);
 
-const DenomGrid = React.forwardRef(function DenomGrid({ prefix, gridClass, totalLabel, onTotalChange, storageKey }, ref) {
+function DenomGrid({ prefix, gridClass, totalLabel, onTotalChange, storageKey, ref }) {
   const [vals, setVals] = useState(() => {
     if (storageKey) {
       try {
@@ -41,18 +41,18 @@ const DenomGrid = React.forwardRef(function DenomGrid({ prefix, gridClass, total
     getValues: () => ({ ...vals }),
   }), [vals]);
 
-  useEffect(() => { if (onTotalChange) onTotalChange(total); }, [total]); // eslint-disable-line
+  // Notificar al padre el total inicial (al montar, por si viene de localStorage)
+  useEffect(() => { if (onTotalChange) onTotalChange(total); }, []); // eslint-disable-line
 
   const handleChange = (key) => (e) => {
     const raw = e.target.value;
     const v = raw === '' ? '' : String(Math.max(0, parseInt(raw, 10) || 0));
-    setVals(prev => {
-      const next = { ...prev, [key]: v };
-      if (storageKey) {
-        try { localStorage.setItem(storageKey, JSON.stringify(next)); } catch (_) {}
-      }
-      return next;
-    });
+    const newVals = { ...vals, [key]: v };
+    if (storageKey) {
+      try { localStorage.setItem(storageKey, JSON.stringify(newVals)); } catch (_) {}
+    }
+    setVals(newVals);
+    if (onTotalChange) onTotalChange(calcDenomTotal(newVals));
   };
 
   return (
@@ -64,9 +64,9 @@ const DenomGrid = React.forwardRef(function DenomGrid({ prefix, gridClass, total
             <input
               id={`${prefix}-${key}`}
               name={`${prefix}-${key}`}
-              type="number"
-              min="0"
-              step="1"
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
               value={vals[key]}
               onChange={handleChange(key)}
               placeholder="0"
@@ -80,40 +80,40 @@ const DenomGrid = React.forwardRef(function DenomGrid({ prefix, gridClass, total
       </div>
     </>
   );
-});
+}
 // ─────────────────────────────────────────────────────────────────────────────
 
 function AppInner() {
   const { user, token, role, logout } = useAuth();
 
   const productos = [
-    { id: 7, nombre: 'Baño de Chocolate', precio: 500, categoria: 'EXTRAS' },
-    { id: 8, nombre: '1/4 kg', precio: 4300, categoria: 'GRANEL' },
-    { id: 9, nombre: '1/2 kg', precio: 7500, categoria: 'GRANEL' },
-    { id: 10, nombre: '1 kg', precio: 13000, categoria: 'GRANEL' },
+    { id: 7, nombre: 'Baño de Chocolate', precio: 600, categoria: 'EXTRAS' },
+    { id: 8, nombre: '1/4 kg', precio: 4500, categoria: 'GRANEL' },
+    { id: 9, nombre: '1/2 kg', precio: 7800, categoria: 'GRANEL' },
+    { id: 10, nombre: '1 kg', precio: 13500, categoria: 'GRANEL' },
     { id: 11, nombre: 'Batido', precio: 3800, categoria: 'BATIDOS' },
     { id: 12, nombre: 'Batido Nesquik', precio: 4200, categoria: 'BATIDOS' },
     { id: 13, nombre: 'Sundae Go', precio: 3700, categoria: 'BATIDOS' },
     { id: 14, nombre: 'Smoothie', precio: 4100, categoria: 'BATIDOS' },
-    { id: 15, nombre: 'Yogurt', precio: 2600, categoria: 'GRANEL' },
-    { id: 16, nombre: 'Helado s/Az', precio: 2600, categoria: 'GRANEL' },
-    { id: 17, nombre: 'Postre Veg', precio: 2600, categoria: 'GRANEL' },
+    { id: 15, nombre: 'Yogurt', precio: 2600, categoria: 'SIN TACC' },
+    { id: 16, nombre: 'Helado s/Az', precio: 2600, categoria: 'SIN TACC' },
+    { id: 17, nombre: 'Postre Veg', precio: 2600, categoria: 'SIN TACC' },
     { id: 18, nombre: 'Almendrado x1', precio: 1600, categoria: 'POSTRES' },
-    { id: 19, nombre: 'Almendrado x8', precio: 9500, categoria: 'POSTRES' },
-    { id: 20, nombre: 'Cassatta x1', precio: 1600, categoria: 'POSTRES' },
-    { id: 21, nombre: 'Cassatta x8', precio: 9500, categoria: 'POSTRES' },
-    { id: 22, nombre: 'Crocante x1', precio: 1600, categoria: 'POSTRES' },
-    { id: 23, nombre: 'Crocante x8', precio: 11000, categoria: 'POSTRES' },
-    { id: 24, nombre: 'Frutezza x1', precio: 1600, categoria: 'POSTRES' },
-    { id: 25, nombre: 'Frutezza x8', precio: 11000, categoria: 'POSTRES' },
-    { id: 26, nombre: 'Suizo x1', precio: 1700, categoria: 'POSTRES' },
-    { id: 27, nombre: 'Suizo x8', precio: 12000, categoria: 'POSTRES' },
-    { id: 28, nombre: 'Escocés x1', precio: 1800, categoria: 'POSTRES' },
-    { id: 29, nombre: 'Escocés x8', precio: 12500, categoria: 'POSTRES' },
-    { id: 30, nombre: 'Alfajor Secreto x1', precio: 2200, categoria: 'POSTRES' },
-    { id: 31, nombre: 'Alfajor Secreto x8', precio: 12500, categoria: 'POSTRES' },
-    { id: 32, nombre: 'Crocantino', precio: 9000, categoria: 'POSTRES' },
-    { id: 33, nombre: 'Delicias', precio: 9000, categoria: 'POSTRES' },
+    { id: 19, nombre: 'Almendrado x 8', precio: 9500, categoria: 'POSTRES' },
+    { id: 20, nombre: 'Cassatta x 1', precio: 1600, categoria: 'POSTRES' },
+    { id: 21, nombre: 'Cassatta x 8', precio: 9500, categoria: 'POSTRES' },
+    { id: 22, nombre: 'Crocante x 1', precio: 1600, categoria: 'POSTRES' },
+    { id: 23, nombre: 'Crocante x 8', precio: 11000, categoria: 'POSTRES' },
+    { id: 24, nombre: 'Frutezza x 1', precio: 1600, categoria: 'POSTRES' },
+    { id: 25, nombre: 'Frutezza x 8', precio: 11000, categoria: 'POSTRES' },
+    { id: 26, nombre: 'Suizo x 1', precio: 1700, categoria: 'POSTRES' },
+    { id: 27, nombre: 'Suizo x 8', precio: 12000, categoria: 'POSTRES' },
+    { id: 28, nombre: 'Escocés x 1', precio: 1800, categoria: 'POSTRES' },
+    { id: 29, nombre: 'Escocés x 8', precio: 12500, categoria: 'POSTRES' },
+    { id: 30, nombre: 'Alfajor Secreto x 1', precio: 2200, categoria: 'POSTRES' },
+    { id: 31, nombre: 'Alfajor Secreto x 6', precio: 12500, categoria: 'POSTRES' },
+    { id: 32, nombre: 'Crocantino', precio: 9500, categoria: 'POSTRES' },
+    { id: 33, nombre: 'Delicias', precio: 9500, categoria: 'POSTRES' },
     { id: 93, nombre: 'Chocolate', precio: 7500, categoria: 'TENTACIONES' },
     { id: 99, nombre: 'Crema Americana', precio: 7500, categoria: 'TENTACIONES' },
     { id: 102, nombre: 'Crema Cookie', precio: 7500, categoria: 'TENTACIONES' },
@@ -130,13 +130,13 @@ function AppInner() {
     { id: 106, nombre: 'GRIDO 2 Bochas', precio: 3300, categoria: 'CUCURUCHOS' },
     { id: 107, nombre: 'GRIDO 3 Bochas', precio: 3700, categoria: 'CUCURUCHOS' },
     { id: 108, nombre: 'Super Gridito', precio: 2500, categoria: 'CUCURUCHOS' },
-    { id: 36, nombre: 'Palito Bombón x1', precio: 900, categoria: 'PALITOS' },
+    { id: 36, nombre: 'Palito Bombón x1', precio: 1000, categoria: 'PALITOS' },
     { id: 37, nombre: 'Palito Bombón x10', precio: 7000, categoria: 'PALITOS' },
     { id: 38, nombre: 'Palito Bombón x20', precio: 14000, categoria: 'PALITOS' },
-    { id: 39, nombre: 'Palito Cremoso x1', precio: 800, categoria: 'PALITOS' },
+    { id: 39, nombre: 'Palito Cremoso x1', precio: 900, categoria: 'PALITOS' },
     { id: 40, nombre: 'Palito Cremoso x10', precio: 5500, categoria: 'PALITOS' },
     { id: 41, nombre: 'Palito Cremoso x20', precio: 11000, categoria: 'PALITOS' },
-    { id: 42, nombre: 'Palito Frutal x1', precio: 700, categoria: 'PALITOS' },
+    { id: 42, nombre: 'Palito Frutal x1', precio: 800, categoria: 'PALITOS' },
     { id: 43, nombre: 'Palito Frutal x10', precio: 5000, categoria: 'PALITOS' },
     { id: 44, nombre: 'Palito Frutal x20', precio: 10000, categoria: 'PALITOS' },
     { id: 45, nombre: 'Torta Frutilla', precio: 14000, categoria: 'TORTAS' },
@@ -167,28 +167,28 @@ function AppInner() {
     { id: 68, nombre: 'Cofler 55gr', precio: 2700, categoria: 'EXTRAS' },
     { id: 69, nombre: 'Gelatinas', precio: 700, categoria: 'EXTRAS' },
     { id: 70, nombre: 'Gaseosa 1.5lt', precio: 0, categoria: 'BEBIDAS' },
-    { id: 71, nombre: 'Gaseosa 500ml', precio: 1700, categoria: 'BEBIDAS' },
-    { id: 72, nombre: 'Lata', precio: 1400, categoria: 'BEBIDAS' },
-    { id: 73, nombre: 'Baggio', precio: 700, categoria: 'BEBIDAS' },
+    { id: 71, nombre: 'Gaseosa 500ml', precio: 2000, categoria: 'BEBIDAS' },
+    { id: 72, nombre: 'Lata', precio: 1700, categoria: 'BEBIDAS' },
+    { id: 73, nombre: 'Baggio', precio: 800, categoria: 'BEBIDAS' },
     { id: 74, nombre: 'Agua 500ml', precio: 1000, categoria: 'BEBIDAS' },
     { id: 75, nombre: 'Agua 2lt', precio: 2000, categoria: 'BEBIDAS' },
     { id: 76, nombre: '2 de 2 Bochas', precio: 6000, categoria: 'PROMOCIONES' },
-    { id: 77, nombre: '2 de 1/4', precio: 8000, categoria: 'PROMOCIONES' },
-    { id: 78, nombre: 'kg + medio', precio: 19000, categoria: 'PROMOCIONES' },
-    { id: 79, nombre: '2 Kilos', precio: 24000, categoria: 'PROMOCIONES' },
+    { id: 77, nombre: '2 de 1/4', precio: 8500, categoria: 'PROMOCIONES' },
+    { id: 78, nombre: 'kg + medio', precio: 19800, categoria: 'PROMOCIONES' },
+    { id: 79, nombre: '2 Kilos', precio: 25000, categoria: 'PROMOCIONES' },
     { id: 80, nombre: '2 Bocha TOY', precio: 4100, categoria: 'PROMOCIONES' },
     { id: 81, nombre: '3x2 Alm o Cas', precio: 19000, categoria: 'PROMOCIONES' },
     { id: 82, nombre: '2 Escocés', precio: 23000, categoria: 'PROMOCIONES' },
-    { id: 83, nombre: 'Kilo Reutilizable', precio: 20300, categoria: 'PROMOCIONES' },
-    { id: 84, nombre: 'Recarga Kilo', precio: 11100, categoria: 'PROMOCIONES' },
-    { id: 85, nombre: 'Recarga Medio kilo', precio: 6500, categoria: 'PROMOCIONES' },
-    { id: 89, nombre: 'Familiar nro 1', precio: 14000, categoria: 'FAMILIARES' },
-    { id: 90, nombre: 'Familiar nro 2', precio: 14000, categoria: 'FAMILIARES' },
-    { id: 91, nombre: 'Familiar nro 3', precio: 14000, categoria: 'FAMILIARES' },
-    { id: 92, nombre: 'Familiar nro 4', precio: 14000, categoria: 'FAMILIARES' }
+    { id: 83, nombre: 'Kilo Reutilizable', precio: 22500, categoria: 'PROMOCIONES' },
+    { id: 84, nombre: 'Recarga Kilo', precio: 12200, categoria: 'PROMOCIONES' },
+    { id: 85, nombre: 'Recarga Medio kilo', precio: 7000, categoria: 'PROMOCIONES' },
+    { id: 89, nombre: 'Familiar nro 1', precio: 14500, categoria: 'FAMILIARES' },
+    { id: 90, nombre: 'Familiar nro 2', precio: 14500, categoria: 'FAMILIARES' },
+    { id: 91, nombre: 'Familiar nro 3', precio: 14500, categoria: 'FAMILIARES' },
+    { id: 92, nombre: 'Familiar nro 4', precio: 14500, categoria: 'FAMILIARES' }
   ];
 
-  const categorias = ['GRANEL', 'POSTRES', 'PALITOS', 'TORTAS', 'PIZZAS', 'EXTRAS', 'BEBIDAS', 'PROMOCIONES', 'FAMILIARES', 'TENTACIONES', 'CUCURUCHOS', 'BATIDOS'];
+  const categorias = ['GRANEL', 'POSTRES', 'PALITOS', 'TORTAS', 'PIZZAS', 'EXTRAS', 'BEBIDAS', 'PROMOCIONES', 'FAMILIARES', 'TENTACIONES', 'CUCURUCHOS', 'BATIDOS', 'SIN TACC'];
 
   const [carrito, setCarrito] = useState([]);
   const [seleccionado, setSeleccionado] = useState(null);
