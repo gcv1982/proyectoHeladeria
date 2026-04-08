@@ -394,17 +394,17 @@ function AppInner() {
     }
   };
 
-    // Cargar ventas del día desde la API (BD)
+    // Cargar ventas del mes desde la API (BD)
     const apiCargarVentasDelDia = async () => {
       if (!user || !token) return;
       try {
         const hoy = new Date();
         const yyyy = hoy.getFullYear();
         const mm = String(hoy.getMonth() + 1).padStart(2, '0');
-        const dd = String(hoy.getDate()).padStart(2, '0');
-        const fecha = `${yyyy}-${mm}-${dd}`;
+        const fechaInicio = `${yyyy}-${mm}-01`;
+        const fechaFin = `${yyyy}-${mm}-${String(hoy.getDate()).padStart(2, '0')}`;
 
-        const response = await fetch(`${API_URL}/ventas?fecha_inicio=${fecha}&fecha_fin=${fecha}`, {
+        const response = await fetch(`${API_URL}/ventas?fecha_inicio=${fechaInicio}&fecha_fin=${fechaFin}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
 
@@ -993,7 +993,7 @@ function AppInner() {
   return (
     <div className="App">
       <div style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center', maxWidth: '1400px', margin: '0 auto 30px', gap: '12px' }}>
-        <h1 style={{ margin: 0, marginRight: '8px', fontSize: '18px', fontWeight: 600 }}>🍦 Grido Laspiur</h1>
+        <h1 style={{ margin: 0, marginRight: '8px', fontSize: '14px', fontWeight: 600 }}>🍦 Grido Laspiur</h1>
           <div className="header-actions" style={{ display: 'flex', gap: 0, alignItems: 'center', marginLeft: 'auto' }}>
             <nav className="main-nav" style={{ display: 'flex', gap: '6px' }}>
               <button className={`nav-btn ${mostrarDashboard ? 'active' : ''}`} onClick={() => { setMostrarDashboard(true); setMostrarCaja(false); setMostrarRetiros(false); }}>Dashboard</button>
@@ -1334,7 +1334,7 @@ function AppInner() {
             );
           })()}
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginTop: '24px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '24px', marginTop: '24px' }}>
             {/* CALENDARIO INTERACTIVO */}
             <div className="top-productos">
               <h3 style={{ color: '#000' }}>📅 Selecciona un Día</h3>
@@ -1356,37 +1356,39 @@ function AppInner() {
                       <div style={{ textAlign: 'center', marginBottom: '12px', fontWeight: 'bold', color: '#000' }}>
                         {nombreMes.toUpperCase()}
                       </div>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px', marginBottom: '12px' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '2px', marginBottom: '8px' }}>
                         {diasSemana.map(dia => (
-                          <div key={dia} style={{ textAlign: 'center', fontWeight: 'bold', color: '#000', fontSize: '12px', padding: '4px' }}>
+                          <div key={dia} style={{ textAlign: 'center', fontWeight: 'bold', color: '#000', fontSize: '10px', padding: '2px' }}>
                             {dia}
                           </div>
                         ))}
                       </div>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '2px' }}>
                         {Array(diaInicio).fill(null).map((_, i) => (
-                          <div key={`vacio-${i}`} style={{ padding: '8px', textAlign: 'center' }}></div>
+                          <div key={`vacio-${i}`} style={{ padding: '4px', textAlign: 'center' }}></div>
                         ))}
                         {Array.from({ length: diasDelMes }, (_, i) => i + 1).map(dia => {
                           const fechaString = `${año}-${String(mes + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
                           const ventasEnEsteDia = ventasDelDia.filter(v => (v.fecha || '').slice(0, 10) === fechaString);
                           const tieneVentas = ventasEnEsteDia.length > 0;
                           const estaSeleccionado = diaSeleccionado === fechaString;
-                          
+
                           return (
                             <button
                               key={dia}
                               onClick={() => setDiaSeleccionado(fechaString)}
                               style={{
-                                padding: '8px',
+                                padding: '4px 2px',
                                 border: estaSeleccionado ? '2px solid #ff00ff' : '1px solid #ccc',
                                 backgroundColor: estaSeleccionado ? '#fff3e0' : tieneVentas ? '#e8f5e9' : '#fff',
                                 borderRadius: '4px',
                                 cursor: 'pointer',
                                 textAlign: 'center',
                                 color: '#000',
+                                fontSize: '11px',
                                 fontWeight: tieneVentas ? 'bold' : 'normal',
-                                transition: 'all 0.2s'
+                                transition: 'all 0.2s',
+                                minWidth: 0
                               }}
                               onMouseEnter={(e) => !estaSeleccionado && (e.target.style.backgroundColor = '#f0f0f0')}
                               onMouseLeave={(e) => !estaSeleccionado && (e.target.style.backgroundColor = tieneVentas ? '#e8f5e9' : '#fff')}
@@ -1418,7 +1420,7 @@ function AppInner() {
                     return <div style={{ textAlign: 'center', padding: '20px', color: '#999' }}>No hay ventas este día</div>;
                   }
                   
-                  const totalDia = ventasDelDiaSeleccionado.reduce((sum, v) => sum + (v.total || 0), 0);
+                  const totalDia = ventasDelDiaSeleccionado.reduce((sum, v) => sum + (parseFloat(v.total) || 0), 0);
                   const totalProductos = ventasDelDiaSeleccionado.reduce((sum, v) => sum + (v.items?.length || 0), 0);
                   
                   // Agrupar productos por nombre
@@ -1435,12 +1437,12 @@ function AppInner() {
                   
                   return (
                     <>
-                      <div style={{ padding: '12px', backgroundColor: '#f0f0f0', borderRadius: '6px', marginBottom: '12px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', color: '#000' }}>
+                      <div style={{ padding: '10px', backgroundColor: '#f0f0f0', borderRadius: '6px', marginBottom: '10px', fontSize: '12px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', color: '#000' }}>
                           <span>💰 Total del día:</span>
-                          <span style={{ fontWeight: 'bold', fontSize: '18px' }}>${totalDia.toLocaleString()}</span>
+                          <span style={{ fontWeight: 'bold', fontSize: '14px' }}>${totalDia.toLocaleString()}</span>
                         </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', color: '#000' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', color: '#000', marginBottom: '4px' }}>
                           <span>🛒 Transacciones:</span>
                           <span style={{ fontWeight: 'bold' }}>{ventasDelDiaSeleccionado.length}</span>
                         </div>
@@ -1449,22 +1451,22 @@ function AppInner() {
                           <span style={{ fontWeight: 'bold' }}>{totalProductos} unidades</span>
                         </div>
                       </div>
-                      
-                      <h4 style={{ color: '#000', marginTop: '12px' }}>Productos vendidos:</h4>
-                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', marginTop: '8px' }}>
+
+                      <h4 style={{ color: '#000', marginTop: '10px', fontSize: '12px' }}>Productos vendidos:</h4>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px', marginTop: '6px' }}>
                         <thead>
                           <tr style={{ backgroundColor: '#f0f0f0', borderBottom: '2px solid #ddd' }}>
-                            <th style={{ padding: '8px', textAlign: 'left', color: '#000' }}>Producto</th>
-                            <th style={{ padding: '8px', textAlign: 'center', color: '#000' }}>Cantidad</th>
-                            <th style={{ padding: '8px', textAlign: 'right', color: '#000' }}>Total</th>
+                            <th style={{ padding: '6px', textAlign: 'left', color: '#000' }}>Producto</th>
+                            <th style={{ padding: '6px', textAlign: 'center', color: '#000' }}>Cant.</th>
+                            <th style={{ padding: '6px', textAlign: 'right', color: '#000' }}>Total</th>
                           </tr>
                         </thead>
                         <tbody>
                           {Object.entries(productosMap).map(([nombre, datos], idx) => (
                             <tr key={idx} style={{ borderBottom: '1px solid #eee' }}>
-                              <td style={{ padding: '8px', color: '#000' }}>{nombre}</td>
-                              <td style={{ padding: '8px', textAlign: 'center', color: '#000' }}>{datos.cantidad}x</td>
-                              <td style={{ padding: '8px', textAlign: 'right', fontWeight: 'bold', color: '#000' }}>${datos.total.toLocaleString()}</td>
+                              <td style={{ padding: '6px', color: '#000' }}>{nombre}</td>
+                              <td style={{ padding: '6px', textAlign: 'center', color: '#000' }}>{datos.cantidad}x</td>
+                              <td style={{ padding: '6px', textAlign: 'right', fontWeight: 'bold', color: '#000' }}>${datos.total.toLocaleString()}</td>
                             </tr>
                           ))}
                         </tbody>

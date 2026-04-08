@@ -1426,12 +1426,12 @@
 .main-nav { display: flex; gap: 0px; align-items: center; margin-left: 0; }
 .nav-btn {
   background: transparent;
-  padding: 10px 18px;
+  padding: 7px 12px;
   border: none;
   border-radius: 0;
   border-right: 2px solid white;
   cursor: pointer;
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 600;
   font-family: 'Gotham Rounded Medium', sans-serif;
   transition: background 0.2s ease;
@@ -1447,19 +1447,19 @@
 .nav-btn.active { background: rgba(255,255,255,0.2); color: #ffffff; border-left-color: rgba(255,255,255,0.25); }
 
 /* Unificar header buttons */
-.btn-open-caja, .btn-logout { padding: 10px 18px; min-height: 36px; display: inline-flex; align-items: center; justify-content: center; font-size: 14px; color: #ffffff; background: #dc3545 ; border: none; border-left: 1px solid rgba(255,255,255,0.12);font-family: 'GothamRoundedMedium', sans-serif;
+.btn-open-caja, .btn-logout { padding: 7px 12px; min-height: 30px; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; color: #ffffff; background: #dc3545 ; border: none; border-left: 1px solid rgba(255,255,255,0.12);font-family: 'GothamRoundedMedium', sans-serif;
   transition: all 0.2s ease; }
 .btn-open-caja:hover, .btn-logout:hover { background: rgba(125,211,252,0.12); color: #ffffff; opacity: 0.9;}
 .btn-open-caja.open { background: #28a745(135deg,#10b981 0%, #059669 100%); color: #ffffff; border-left-color: rgba(255,255,255,0.25); }
 
 .btn-logout {
-  padding: 10px 18px;
+  padding: 7px 12px;
   background: transparent;
   color: white;
   border: none;
   border-radius: 0;
   cursor: pointer;
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 600;
   font-family: 'GothamRoundedMedium', sans-serif;
   transition: background 0.2s ease;
@@ -1469,10 +1469,10 @@
   background: rgba(255, 0, 0, 0.2);
 }
 
-.usuario-info { padding: 10px 18px;
+.usuario-info { padding: 7px 12px;
   background: rgba(255, 255, 255, 0.1);
   color: white;
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 600;
   border-right: 2px solid white; }
 
