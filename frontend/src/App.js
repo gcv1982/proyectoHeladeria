@@ -342,6 +342,23 @@ function AppInner() {
     }
   };
 
+  const eliminarVenta = async (id) => {
+    if (!window.confirm('¿Estás seguro que querés eliminar esta venta?')) return;
+    try {
+      const response = await fetch(`${API_URL}/ventas/${id}/cancelar`, {
+        method: 'PUT',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (response.ok) {
+        setVentasDelDia(prev => prev.filter(v => v.id !== id));
+      } else {
+        alert('No se pudo eliminar la venta.');
+      }
+    } catch {
+      alert('Error de conexión.');
+    }
+  };
+
   const abrirEdicionVenta = (venta) => {
     setVentaEditando({
       id: venta.id,
@@ -425,11 +442,12 @@ function AppInner() {
     useEffect(() => {
       if (user && cajaAbierta && mostrarDashboard) {
         apiCargarVentasDelDia();
+        const intervalo = setInterval(apiCargarVentasDelDia, 30000);
+        return () => clearInterval(intervalo);
       }
     }, [user, cajaAbierta, mostrarDashboard]);
 
   const agregarRetiro = () => {
-    if (!isAdmin) { alert('No tiene permisos para registrar retiros'); return; }
     const monto = parseFloat(nuevoRetiroMonto);
     if (!monto || monto <= 0) { alert('Ingrese un monto válido para el retiro'); return; }
     const montoDisponible = (inicioCaja ? inicioCaja.montoInicial : 0) + ventasDelDia.reduce((s, v) => {
@@ -1254,8 +1272,11 @@ function AppInner() {
                           </td>
                           <td style={{ padding: '8px', textAlign: 'right', fontWeight: 'bold', color: '#000' }}>${(v.total || 0).toLocaleString()}</td>
                           {isAdmin && (
-                            <td style={{ padding: '8px', textAlign: 'center' }}>
-                              <button onClick={() => abrirEdicionVenta(v)} style={{ background: '#667eea', color: 'white', border: 'none', borderRadius: '4px', padding: '3px 8px', cursor: 'pointer', fontSize: '12px' }}>Editar</button>
+                            <td style={{ padding: '8px', textAlign: 'right' }}>
+                              <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end' }}>
+                                <button onClick={() => abrirEdicionVenta(v)} style={{ background: '#667eea', color: 'white', border: 'none', borderRadius: '4px', padding: '3px 8px', cursor: 'pointer', fontSize: '12px' }}>Editar</button>
+                                <button onClick={() => eliminarVenta(v.id)} style={{ background: '#e53e3e', color: 'white', border: 'none', borderRadius: '4px', padding: '3px 8px', cursor: 'pointer', fontSize: '12px' }}>Eliminar</button>
+                              </div>
                             </td>
                           )}
                         </tr>

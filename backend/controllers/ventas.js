@@ -50,7 +50,7 @@ exports.obtenerVentas = async (req, res) => {
   try {
     const { usuario_id, fecha_inicio, fecha_fin, limite = 100, offset = 0 } = req.query;
 
-    let query = 'SELECT * FROM ventas WHERE 1=1';
+    let query = "SELECT * FROM ventas WHERE estado != 'cancelada'";
     let params = [];
     let paramCount = 1;
 
