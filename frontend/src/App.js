@@ -156,16 +156,16 @@ function AppInner() {
     { id: 57, nombre: 'Salsita 15gr', precio: 550, categoria: 'EXTRAS' },
     { id: 58, nombre: 'Bengala Común', precio: 600, categoria: 'EXTRAS' },
     { id: 59, nombre: 'Bengala Brillo', precio: 1000, categoria: 'EXTRAS' },
-    { id: 60, nombre: 'Block 38gr', precio: 1400, categoria: 'EXTRAS' },
-    { id: 61, nombre: 'Block 110gr', precio: 4200, categoria: 'EXTRAS' },
-    { id: 62, nombre: 'Block 170gr', precio: 7000, categoria: 'EXTRAS' },
-    { id: 63, nombre: 'Block 300gr', precio: 10800, categoria: 'EXTRAS' },
-    { id: 64, nombre: 'Graffiti 45gr', precio: 1500, categoria: 'EXTRAS' },
-    { id: 65, nombre: 'Roclets 40gr', precio: 1400, categoria: 'EXTRAS' },
-    { id: 66, nombre: 'Maní c/Choco', precio: 1100, categoria: 'EXTRAS' },
-    { id: 67, nombre: 'Cofler Tofi/Bon', precio: 800, categoria: 'EXTRAS' },
-    { id: 68, nombre: 'Cofler 55gr', precio: 2700, categoria: 'EXTRAS' },
-    { id: 69, nombre: 'Gelatinas', precio: 700, categoria: 'EXTRAS' },
+    { id: 60, nombre: 'Block 38gr', precio: 1400, categoria: 'CHOCOLATES' },
+    { id: 61, nombre: 'Block 110gr', precio: 4200, categoria: 'CHOCOLATES' },
+    { id: 62, nombre: 'Block 170gr', precio: 7000, categoria: 'CHOCOLATES' },
+    { id: 63, nombre: 'Block 300gr', precio: 10800, categoria: 'CHOCOLATES' },
+    { id: 64, nombre: 'Graffiti 45gr', precio: 1500, categoria: 'CHOCOLATES' },
+    { id: 65, nombre: 'Roclets 40gr', precio: 1400, categoria: 'CHOCOLATES' },
+    { id: 66, nombre: 'Maní c/Choco', precio: 1100, categoria: 'CHOCOLATES' },
+    { id: 67, nombre: 'Cofler Tofi/Bon', precio: 800, categoria: 'CHOCOLATES' },
+    { id: 68, nombre: 'Cofler 55gr', precio: 2700, categoria: 'CHOCOLATES' },
+    { id: 69, nombre: 'Gelatinas', precio: 700, categoria: 'CHOCOLATES' },
     { id: 70, nombre: 'Gaseosa 1.5lt', precio: 0, categoria: 'BEBIDAS' },
     { id: 71, nombre: 'Gaseosa 500ml', precio: 2000, categoria: 'BEBIDAS' },
     { id: 72, nombre: 'Lata', precio: 1700, categoria: 'BEBIDAS' },
@@ -188,7 +188,7 @@ function AppInner() {
     { id: 92, nombre: 'Familiar nro 4', precio: 14500, categoria: 'FAMILIARES' }
   ];
 
-  const categorias = ['GRANEL', 'POSTRES', 'PALITOS', 'TORTAS', 'PIZZAS', 'EXTRAS', 'BEBIDAS', 'PROMOCIONES', 'FAMILIARES', 'TENTACIONES', 'CUCURUCHOS', 'BATIDOS', 'SIN TACC'];
+  const categorias = ['GRANEL', 'POSTRES', 'CUCURUCHOS', 'PALITOS', 'TORTAS', 'FAMILIARES', 'TENTACIONES',  'BATIDOS', 'PROMOCIONES', 'EXTRAS', 'PIZZAS', 'SIN TACC', 'CHOCOLATES'];
 
   const [carrito, setCarrito] = useState([]);
   const [seleccionado, setSeleccionado] = useState(null);
@@ -233,6 +233,8 @@ function AppInner() {
   // Dashboard: día seleccionado para ver detalles
   const [diaSeleccionado, setDiaSeleccionado] = useState(null);
   const [detalleDashboard, setDetalleDashboard] = useState(null); // 'ventas' | 'productos' | null
+  const [calMes, setCalMes] = useState(new Date().getMonth());
+  const [calAño, setCalAño] = useState(new Date().getFullYear());
 
   useEffect(() => {
     try {
@@ -394,58 +396,62 @@ function AppInner() {
     }
   };
 
-    // Cargar ventas del mes desde la API (BD)
-    const apiCargarVentasDelDia = async () => {
-      if (!user || !token) return;
-      try {
-        const hoy = new Date();
-        const yyyy = hoy.getFullYear();
-        const mm = String(hoy.getMonth() + 1).padStart(2, '0');
-        const fechaInicio = `${yyyy}-${mm}-01`;
-        const fechaFin = `${yyyy}-${mm}-${String(hoy.getDate()).padStart(2, '0')}`;
+  // Cargar ventas del mes visible en el calendario
+  const apiCargarVentasDelDia = async (mesVer = calMes, añoVer = calAño) => {
+    const tokenActual = localStorage.getItem('auth_token');
+    if (!user || !tokenActual) return;
+    try {
+      const ultimoDia = new Date(añoVer, mesVer + 1, 0).getDate();
+      const fechaInicio = `${añoVer}-${String(mesVer + 1).padStart(2, '0')}-01`;
+      const fechaFin = `${añoVer}-${String(mesVer + 1).padStart(2, '0')}-${String(ultimoDia).padStart(2, '0')}`;
 
-        const response = await fetch(`${API_URL}/ventas?fecha_inicio=${fechaInicio}&fecha_fin=${fechaFin}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
+      const response = await fetch(`${API_URL}/ventas?fecha_inicio=${fechaInicio}&fecha_fin=${fechaFin}`, {
+        headers: { 'Authorization': `Bearer ${tokenActual}` }
+      });
 
-        if (!response.ok) {
-          const err = await response.json().catch(() => ({}));
-          console.error('Error al cargar ventas del día:', err);
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        if (response.status === 403) {
+          alert('Tu sesión expiró. Por favor volvé a iniciar sesión.');
+          logout();
           return;
         }
-
-        const data = await response.json();
-        if (data && Array.isArray(data.ventas)) {
-          const ventasFormateadas = data.ventas.map(v => {
-            let items = v.items;
-            let pagos = v.pagos;
-            try {
-              items = typeof items === 'string' && items.trim() ? JSON.parse(items) : (items || []);
-            } catch (e) {
-              items = [];
-            }
-            try {
-              pagos = typeof pagos === 'string' && pagos.trim() ? JSON.parse(pagos) : (pagos || []);
-            } catch (e) {
-              pagos = [];
-            }
-            return { ...v, items, pagos };
-          });
-          setVentasDelDia(ventasFormateadas);
-        }
-      } catch (error) {
-        console.error('Error al obtener ventas del día:', error);
+        console.error('Error al cargar ventas:', err);
+        return;
       }
-    };
 
-    // Actualizar ventas del día cuando se muestre el dashboard
-    useEffect(() => {
-      if (user && cajaAbierta && mostrarDashboard) {
-        apiCargarVentasDelDia();
-        const intervalo = setInterval(apiCargarVentasDelDia, 30000);
-        return () => clearInterval(intervalo);
+      const data = await response.json();
+      if (data && Array.isArray(data.ventas)) {
+        const ventasFormateadas = data.ventas.map(v => {
+          let items = v.items;
+          let pagos = v.pagos;
+          try {
+            items = typeof items === 'string' && items.trim() ? JSON.parse(items) : (items || []);
+          } catch (e) {
+            items = [];
+          }
+          try {
+            pagos = typeof pagos === 'string' && pagos.trim() ? JSON.parse(pagos) : (pagos || []);
+          } catch (e) {
+            pagos = [];
+          }
+          return { ...v, items, pagos };
+        });
+        setVentasDelDia(ventasFormateadas);
       }
-    }, [user, cajaAbierta, mostrarDashboard]);
+    } catch (error) {
+      console.error('Error al obtener ventas:', error);
+    }
+  };
+
+  // Actualizar ventas cuando se muestre el dashboard
+  useEffect(() => {
+    if (user && token && mostrarDashboard) {
+      apiCargarVentasDelDia(calMes, calAño);
+      const intervalo = setInterval(() => apiCargarVentasDelDia(calMes, calAño), 30000);
+      return () => clearInterval(intervalo);
+    }
+  }, [user, token, mostrarDashboard, calMes, calAño]);
 
   const agregarRetiro = () => {
     const monto = parseFloat(nuevoRetiroMonto);
@@ -1340,21 +1346,40 @@ function AppInner() {
               <h3 style={{ color: '#000' }}>📅 Selecciona un Día</h3>
               <div style={{ marginTop: '12px', padding: '16px', backgroundColor: '#f9f9f9', borderRadius: '6px', border: '1px solid #ddd' }}>
                 {(() => {
-                  const hoy = new Date();
-                  const año = hoy.getFullYear();
-                  const mes = hoy.getMonth();
+                  const año = calAño;
+                  const mes = calMes;
                   const primerDia = new Date(año, mes, 1);
                   const ultimoDia = new Date(año, mes + 1, 0);
                   const diaInicio = primerDia.getDay();
                   const diasDelMes = ultimoDia.getDate();
-                  
                   const diasSemana = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
-                  const nombreMes = new Date(año, mes).toLocaleDateString('es-AR', { month: 'long', year: 'numeric' });
-                  
+                  const nombreMes = new Date(año, mes).toLocaleDateString('es-AR', { month: 'long' });
+                  const años = [];
+                  for (let y = new Date().getFullYear(); y >= 2024; y--) años.push(y);
+                  const meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+                  const irMesAnterior = () => {
+                    if (mes === 0) { setCalMes(11); setCalAño(año - 1); }
+                    else setCalMes(mes - 1);
+                  };
+                  const irMesSiguiente = () => {
+                    if (mes === 11) { setCalMes(0); setCalAño(año + 1); }
+                    else setCalMes(mes + 1);
+                  };
+
                   return (
                     <>
-                      <div style={{ textAlign: 'center', marginBottom: '12px', fontWeight: 'bold', color: '#000' }}>
-                        {nombreMes.toUpperCase()}
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px', gap: '4px' }}>
+                        <button onClick={irMesAnterior} style={{ background: '#667eea', color: 'white', border: 'none', borderRadius: '4px', padding: '3px 8px', cursor: 'pointer', fontSize: '14px' }}>‹</button>
+                        <div style={{ display: 'flex', gap: '4px', flex: 1, justifyContent: 'center' }}>
+                          <select value={mes} onChange={e => setCalMes(Number(e.target.value))} style={{ fontSize: '11px', padding: '2px', border: '1px solid #ccc', borderRadius: '4px' }}>
+                            {meses.map((m, i) => <option key={i} value={i}>{m}</option>)}
+                          </select>
+                          <select value={año} onChange={e => setCalAño(Number(e.target.value))} style={{ fontSize: '11px', padding: '2px', border: '1px solid #ccc', borderRadius: '4px' }}>
+                            {años.map(y => <option key={y} value={y}>{y}</option>)}
+                          </select>
+                        </div>
+                        <button onClick={irMesSiguiente} style={{ background: '#667eea', color: 'white', border: 'none', borderRadius: '4px', padding: '3px 8px', cursor: 'pointer', fontSize: '14px' }}>›</button>
                       </div>
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '2px', marginBottom: '8px' }}>
                         {diasSemana.map(dia => (
@@ -1557,11 +1582,13 @@ function AppInner() {
       ${cat === 'POSTRES' ? 'bombones-hero' : ''} 
       ${cat === 'GRANEL' ? 'granel-hero' : ''} 
       ${cat === 'BEBIDAS' ? 'bebidas-hero' : ''} 
-      ${cat === 'BATIDOS' ? 'batidos-hero' : ''}`} 
+      ${cat === 'BATIDOS' ? 'batidos-hero' : ''}
+      ${cat === 'SIN TACC' ? 'sintacc-hero' : ''}
+      ${cat === 'CHOCOLATES' ? 'chocolates-hero' : ''}`}
     aria-label={cat} 
     onClick={() => setCategoriaActiva(cat)}
   >
-    {!['TORTAS', 'TENTACIONES', 'PALITOS', 'PIZZAS', 'FAMILIARES', 'CUCURUCHOS', 'POSTRES', 'GRANEL', 'BEBIDAS', 'BATIDOS'].includes(cat) && cat}
+    {!['TORTAS', 'TENTACIONES', 'PALITOS', 'PIZZAS', 'FAMILIARES', 'CUCURUCHOS', 'POSTRES', 'GRANEL', 'BEBIDAS', 'BATIDOS', 'SIN TACC', 'CHOCOLATES'].includes(cat) && cat}
   </button>
 ))} 
               </div>

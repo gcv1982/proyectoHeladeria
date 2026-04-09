@@ -164,6 +164,8 @@
 .categoria-btn.granel-hero { background-image: url('./assets/kilo.jpeg'); }
 .categoria-btn.bebidas-hero { background-image: url('./assets/bebidas.jpeg'); background-size: 85%; background-color: white; }
 .categoria-btn.batidos-hero { background-image: url('./assets/Smoothie2.jpg'); }
+.categoria-btn.sintacc-hero { background-image: url('./assets/sin tacc.jpg'); }
+.categoria-btn.chocolates-hero { background-image: url('./assets/arcor.jpg'); }
 
 .categoria-btn.torta-hero,
 .categoria-btn.tentacion-hero,
@@ -174,7 +176,9 @@
 .categoria-btn.bombones-hero,
 .categoria-btn.granel-hero,
 .categoria-btn.bebidas-hero,
-.categoria-btn.batidos-hero {
+.categoria-btn.batidos-hero,
+.categoria-btn.sintacc-hero,
+.categoria-btn.chocolates-hero {
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
@@ -191,7 +195,9 @@
 .categoria-btn.bombones-hero::before,
 .categoria-btn.granel-hero::before,
 .categoria-btn.bebidas-hero::before,
-.categoria-btn.batidos-hero::before {
+.categoria-btn.batidos-hero::before,
+.categoria-btn.sintacc-hero::before,
+.categoria-btn.chocolates-hero::before {
   content: none;
 }
 
@@ -204,7 +210,9 @@
 .categoria-btn.bombones-hero span,
 .categoria-btn.granel-hero span,
 .categoria-btn.bebidas-hero span,
-.categoria-btn.batidos-hero span {
+.categoria-btn.batidos-hero span,
+.categoria-btn.sintacc-hero span,
+.categoria-btn.chocolates-hero span {
   display: none !important;
 }
 

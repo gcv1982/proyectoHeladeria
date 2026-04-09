@@ -28,7 +28,7 @@ exports.login = async (req, res) => {
         rol: usuario.rol
       },
       claveSecreta,
-      { expiresIn: '24h' }
+      { expiresIn: '30d' }
     );
 
     res.json({ token });
