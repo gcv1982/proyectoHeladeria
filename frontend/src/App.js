@@ -92,6 +92,11 @@ function AppInner() {
   const [nuevoProducto, setNuevoProducto] = useState({ nombre: '', precio_unitario: '', categoria: 'GRANEL' });
   const [mostrarHistorialCajas, setMostrarHistorialCajas] = useState(false);
   const [historialCajas, setHistorialCajas] = useState([]);
+  const [turnoActivo, setTurnoActivo] = useState(null);
+  const [mostrarMiTurno, setMostrarMiTurno] = useState(false);
+  const [mostrarHistorialTurnos, setMostrarHistorialTurnos] = useState(false);
+  const [historialTurnos, setHistorialTurnos] = useState([]);
+  const [turnoDetalle, setTurnoDetalle] = useState(null); // ventas del turno seleccionado
 
   const categorias = ['GRANEL', 'POSTRES', 'CUCURUCHOS', 'PALITOS', 'TORTAS', 'FAMILIARES', 'TENTACIONES', 'BATIDOS', 'BEBIDAS', 'PROMOCIONES', 'EXTRAS', 'PIZZAS', 'SIN TACC', 'CHOCOLATES'];
 
@@ -181,6 +186,76 @@ function AppInner() {
   };
 
   // ========== FUNCIONES DE API ==========
+
+  const abrirTurno = async () => {
+    const tokenActual = localStorage.getItem('auth_token');
+    if (!tokenActual || !user) return;
+    try {
+      const res = await fetch(`${API_URL}/turnos`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${tokenActual}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ usuario_id: user.id })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setTurnoActivo(data.turno);
+      }
+    } catch (e) { console.error('Error al abrir turno:', e); }
+  };
+
+  const cerrarTurno = async () => {
+    const tokenActual = localStorage.getItem('auth_token');
+    if (!tokenActual || !turnoActivo) return;
+    try {
+      await fetch(`${API_URL}/turnos/${turnoActivo.id}/cerrar`, {
+        method: 'PUT',
+        headers: { 'Authorization': `Bearer ${tokenActual}` }
+      });
+      setTurnoActivo(null);
+    } catch (e) { console.error('Error al cerrar turno:', e); }
+  };
+
+  const cargarTurnoActivo = async () => {
+    const tokenActual = localStorage.getItem('auth_token');
+    if (!tokenActual || !user) return;
+    try {
+      const res = await fetch(`${API_URL}/turnos/activo?usuario_id=${user.id}`, {
+        headers: { 'Authorization': `Bearer ${tokenActual}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setTurnoActivo(data.turno);
+      }
+    } catch (e) { console.error('Error al cargar turno:', e); }
+  };
+
+  const cargarHistorialTurnos = async () => {
+    const tokenActual = localStorage.getItem('auth_token');
+    if (!tokenActual) return;
+    try {
+      const res = await fetch(`${API_URL}/turnos/historial?limite=60`, {
+        headers: { 'Authorization': `Bearer ${tokenActual}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setHistorialTurnos(data.turnos || []);
+      }
+    } catch (e) { console.error('Error al cargar historial de turnos:', e); }
+  };
+
+  const cargarDetalleTurno = async (turnoId) => {
+    const tokenActual = localStorage.getItem('auth_token');
+    if (!tokenActual) return;
+    try {
+      const res = await fetch(`${API_URL}/turnos/${turnoId}/ventas`, {
+        headers: { 'Authorization': `Bearer ${tokenActual}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setTurnoDetalle(data);
+      }
+    } catch (e) { console.error('Error al cargar detalle de turno:', e); }
+  };
 
   const cargarHistorialCajas = async () => {
     const tokenActual = localStorage.getItem('auth_token');
@@ -387,14 +462,14 @@ function AppInner() {
     }
   };
 
-  // Actualizar ventas cuando se muestre el dashboard
-  // Cargar ventas, retiros y productos al iniciar sesión
+  // Cargar ventas, retiros, productos y abrir turno al iniciar sesión
   useEffect(() => {
     if (user && token) {
       const hoy = new Date();
       apiCargarVentasDelDia(hoy.getMonth(), hoy.getFullYear());
       cargarRetiros();
       cargarProductos();
+      abrirTurno();
     }
   }, [user, token]);
 
@@ -1104,12 +1179,14 @@ function AppInner() {
         <h1 style={{ margin: 0, marginRight: '8px', fontSize: '14px', fontWeight: 600 }}>🍦 Grido Laspiur</h1>
           <div className="header-actions" style={{ display: 'flex', gap: 0, alignItems: 'center', marginLeft: 'auto' }}>
             <nav className="main-nav" style={{ display: 'flex', gap: '6px' }}>
-              <button className={`nav-btn ${mostrarDashboard ? 'active' : ''}`} onClick={() => { setMostrarDashboard(true); setMostrarCaja(false); setMostrarRetiros(false); setMostrarGestionProductos(false); setMostrarHistorialCajas(false); }}>Dashboard</button>
-              <button className={`nav-btn ${mostrarCaja ? 'active' : ''}`} onClick={() => { setMostrarCaja(true); setMostrarDashboard(false); setMostrarRetiros(false); setMostrarGestionProductos(false); setMostrarHistorialCajas(false); }}>Caja</button>
-              <button className={`nav-btn ${mostrarRetiros ? 'active' : ''}`} onClick={() => { setMostrarRetiros(true); setMostrarCaja(false); setMostrarDashboard(false); setMostrarGestionProductos(false); setMostrarHistorialCajas(false); }}>Retiros</button>
-              <button className={`nav-btn`} onClick={() => { setMostrarDashboard(false); setMostrarCaja(false); setMostrarRetiros(false); setMostrarGestionProductos(false); setMostrarHistorialCajas(false); setCategoriaActiva(null); }}>Productos</button>
-              {isAdmin && <button className={`nav-btn ${mostrarGestionProductos ? 'active' : ''}`} onClick={() => { setMostrarGestionProductos(true); setMostrarHistorialCajas(false); setMostrarDashboard(false); setMostrarCaja(false); setMostrarRetiros(false); cargarTodosProductos(); }}>Gestión</button>}
-              {isAdmin && <button className={`nav-btn ${mostrarHistorialCajas ? 'active' : ''}`} onClick={() => { setMostrarHistorialCajas(true); setMostrarGestionProductos(false); setMostrarDashboard(false); setMostrarCaja(false); setMostrarRetiros(false); cargarHistorialCajas(); }}>Cajas</button>}
+              <button className={`nav-btn ${mostrarDashboard ? 'active' : ''}`} onClick={() => { setMostrarDashboard(true); setMostrarCaja(false); setMostrarRetiros(false); setMostrarGestionProductos(false); setMostrarHistorialCajas(false); setMostrarMiTurno(false); setMostrarHistorialTurnos(false); }}>Dashboard</button>
+              <button className={`nav-btn ${mostrarCaja ? 'active' : ''}`} onClick={() => { setMostrarCaja(true); setMostrarDashboard(false); setMostrarRetiros(false); setMostrarGestionProductos(false); setMostrarHistorialCajas(false); setMostrarMiTurno(false); setMostrarHistorialTurnos(false); }}>Caja</button>
+              <button className={`nav-btn ${mostrarRetiros ? 'active' : ''}`} onClick={() => { setMostrarRetiros(true); setMostrarCaja(false); setMostrarDashboard(false); setMostrarGestionProductos(false); setMostrarHistorialCajas(false); setMostrarMiTurno(false); setMostrarHistorialTurnos(false); }}>Retiros</button>
+              <button className={`nav-btn`} onClick={() => { setMostrarDashboard(false); setMostrarCaja(false); setMostrarRetiros(false); setMostrarGestionProductos(false); setMostrarHistorialCajas(false); setMostrarMiTurno(false); setMostrarHistorialTurnos(false); setCategoriaActiva(null); }}>Productos</button>
+              <button className={`nav-btn ${mostrarMiTurno ? 'active' : ''}`} onClick={() => { setMostrarMiTurno(true); setMostrarDashboard(false); setMostrarCaja(false); setMostrarRetiros(false); setMostrarGestionProductos(false); setMostrarHistorialCajas(false); setMostrarHistorialTurnos(false); cargarTurnoActivo(); }}>Mi Turno</button>
+              {isAdmin && <button className={`nav-btn ${mostrarGestionProductos ? 'active' : ''}`} onClick={() => { setMostrarGestionProductos(true); setMostrarHistorialCajas(false); setMostrarMiTurno(false); setMostrarHistorialTurnos(false); setMostrarDashboard(false); setMostrarCaja(false); setMostrarRetiros(false); cargarTodosProductos(); }}>Gestión</button>}
+              {isAdmin && <button className={`nav-btn ${mostrarHistorialCajas ? 'active' : ''}`} onClick={() => { setMostrarHistorialCajas(true); setMostrarGestionProductos(false); setMostrarMiTurno(false); setMostrarHistorialTurnos(false); setMostrarDashboard(false); setMostrarCaja(false); setMostrarRetiros(false); cargarHistorialCajas(); }}>Cajas</button>}
+              {isAdmin && <button className={`nav-btn ${mostrarHistorialTurnos ? 'active' : ''}`} onClick={() => { setMostrarHistorialTurnos(true); setMostrarHistorialCajas(false); setMostrarGestionProductos(false); setMostrarMiTurno(false); setMostrarDashboard(false); setMostrarCaja(false); setMostrarRetiros(false); setTurnoDetalle(null); cargarHistorialTurnos(); }}>Turnos</button>}
             </nav>
             <div className="header-right" style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
               <button className={`btn-open-caja ${cajaAbierta ? 'open' : ''}`} onClick={() => { setMostrarDashboard(false); setMostrarCaja(true); }}>{cajaAbierta ? '💰 Caja Abierta' : '💰 Abrir Caja'}</button>
@@ -1132,6 +1209,7 @@ function AppInner() {
                     localStorage.removeItem('inicioCaja');
                     localStorage.removeItem('retiros');
                     localStorage.removeItem('gastos');
+                    cerrarTurno();
                     logout();
                   }}>Cerrar sesión</button>
                 </>
@@ -1452,6 +1530,179 @@ function AppInner() {
             </div>
           )}
         </div>
+
+      ) : mostrarMiTurno ? (
+        <div style={{ padding: '16px', maxWidth: '700px', margin: '0 auto' }}>
+          <h2 style={{ marginBottom: '16px' }}>👤 Mi Turno</h2>
+          {!turnoActivo ? (
+            <p style={{ color: '#999', textAlign: 'center', padding: '32px' }}>No tenés un turno activo.</p>
+          ) : (() => {
+            const inicio = new Date(turnoActivo.fecha_inicio);
+            const fmtHora = (d) => `${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;
+            const fmtFecha = (d) => `${d.getDate().toString().padStart(2,'0')}/${(d.getMonth()+1).toString().padStart(2,'0')}/${d.getFullYear()}`;
+            const ventasTurno = ventasDelDia.filter(v =>
+              v.estado !== 'cancelada' && new Date(v.fecha) >= inicio
+            );
+            const totalTurno = ventasTurno.reduce((s, v) => s + parseFloat(v.total || 0), 0);
+            const porMetodo = {};
+            ventasTurno.forEach(v => {
+              (v.pagos || []).forEach(p => {
+                porMetodo[p.metodo] = (porMetodo[p.metodo] || 0) + parseFloat(p.monto || 0);
+              });
+            });
+            return (
+              <>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '12px', marginBottom: '20px' }}>
+                  <div style={{ background: '#f0fdf4', border: '1px solid #86efac', borderRadius: '10px', padding: '14px', textAlign: 'center' }}>
+                    <div style={{ fontSize: '12px', color: '#16a34a', fontWeight: '600', marginBottom: '4px' }}>INICIO DE TURNO</div>
+                    <div style={{ fontSize: '18px', fontWeight: '700', color: '#111' }}>{fmtHora(inicio)}</div>
+                    <div style={{ fontSize: '12px', color: '#6b7280' }}>{fmtFecha(inicio)}</div>
+                  </div>
+                  <div style={{ background: '#eff6ff', border: '1px solid #93c5fd', borderRadius: '10px', padding: '14px', textAlign: 'center' }}>
+                    <div style={{ fontSize: '12px', color: '#2563eb', fontWeight: '600', marginBottom: '4px' }}>VENTAS</div>
+                    <div style={{ fontSize: '24px', fontWeight: '700', color: '#111' }}>{ventasTurno.length}</div>
+                  </div>
+                  <div style={{ background: '#fefce8', border: '1px solid #fde047', borderRadius: '10px', padding: '14px', textAlign: 'center' }}>
+                    <div style={{ fontSize: '12px', color: '#ca8a04', fontWeight: '600', marginBottom: '4px' }}>TOTAL RECAUDADO</div>
+                    <div style={{ fontSize: '22px', fontWeight: '700', color: '#111' }}>${totalTurno.toLocaleString()}</div>
+                  </div>
+                </div>
+
+                {Object.keys(porMetodo).length > 0 && (
+                  <div style={{ background: '#f8f9fa', borderRadius: '10px', padding: '14px', marginBottom: '20px' }}>
+                    <div style={{ fontSize: '13px', fontWeight: '600', color: '#374151', marginBottom: '10px' }}>Por medio de pago</div>
+                    <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                      {Object.entries(porMetodo).map(([metodo, monto]) => (
+                        <div key={metodo} style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '8px 14px', fontSize: '13px' }}>
+                          <span style={{ color: '#6b7280' }}>{metodo}:</span>
+                          <span style={{ fontWeight: '700', color: '#111', marginLeft: '6px' }}>${monto.toLocaleString()}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {ventasTurno.length > 0 && (
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                      <thead>
+                        <tr style={{ background: '#f1f5f9', borderBottom: '2px solid #e2e8f0' }}>
+                          <th style={{ padding: '8px', textAlign: 'left', color: '#374151' }}>Hora</th>
+                          <th style={{ padding: '8px', textAlign: 'left', color: '#374151' }}>Productos</th>
+                          <th style={{ padding: '8px', textAlign: 'left', color: '#374151' }}>Pago</th>
+                          <th style={{ padding: '8px', textAlign: 'right', color: '#374151' }}>Total</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {ventasTurno.map((v, idx) => {
+                          const fecha = new Date(v.fecha);
+                          return (
+                            <tr key={v.id} style={{ borderBottom: '1px solid #e2e8f0', background: idx % 2 === 0 ? '#fff' : '#fafafa' }}>
+                              <td style={{ padding: '8px', color: '#6b7280', whiteSpace: 'nowrap' }}>{fmtHora(fecha)}</td>
+                              <td style={{ padding: '8px', color: '#111' }}>{(v.items || []).map(it => `${it.cantidad}x ${it.nombre}`).join(', ')}</td>
+                              <td style={{ padding: '8px', color: '#6b7280' }}>{(v.pagos || []).map(p => p.metodo).join(', ')}</td>
+                              <td style={{ padding: '8px', textAlign: 'right', fontWeight: '600', color: '#111' }}>${parseFloat(v.total).toLocaleString()}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </>
+            );
+          })()}
+        </div>
+
+      ) : mostrarHistorialTurnos && isAdmin ? (
+        <div style={{ padding: '16px', maxWidth: '960px', margin: '0 auto' }}>
+          <h2 style={{ marginBottom: '16px' }}>👥 Historial de Turnos</h2>
+          {turnoDetalle ? (
+            <>
+              <button onClick={() => setTurnoDetalle(null)} style={{ marginBottom: '16px', background: '#e2e8f0', border: 'none', borderRadius: '6px', padding: '6px 14px', cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}>← Volver</button>
+              <h3 style={{ fontSize: '15px', marginBottom: '12px', color: '#374151' }}>
+                Turno de {turnoDetalle.turno?.usuario_nombre || '—'} — {turnoDetalle.ventas?.length || 0} ventas
+              </h3>
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                  <thead>
+                    <tr style={{ background: '#f1f5f9', borderBottom: '2px solid #e2e8f0' }}>
+                      <th style={{ padding: '8px', textAlign: 'left', color: '#374151' }}>Hora</th>
+                      <th style={{ padding: '8px', textAlign: 'left', color: '#374151' }}>Productos</th>
+                      <th style={{ padding: '8px', textAlign: 'left', color: '#374151' }}>Pago</th>
+                      <th style={{ padding: '8px', textAlign: 'right', color: '#374151' }}>Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(turnoDetalle.ventas || []).map((v, idx) => {
+                      const fecha = new Date(v.fecha);
+                      const fmtHora = (d) => `${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;
+                      return (
+                        <tr key={v.id} style={{ borderBottom: '1px solid #e2e8f0', background: idx % 2 === 0 ? '#fff' : '#fafafa' }}>
+                          <td style={{ padding: '8px', color: '#6b7280' }}>{fmtHora(fecha)}</td>
+                          <td style={{ padding: '8px', color: '#111' }}>{(v.items || []).map(it => `${it.cantidad}x ${it.nombre}`).join(', ')}</td>
+                          <td style={{ padding: '8px', color: '#6b7280' }}>{(v.pagos || []).map(p => p.metodo).join(', ')}</td>
+                          <td style={{ padding: '8px', textAlign: 'right', fontWeight: '600', color: '#111' }}>${parseFloat(v.total).toLocaleString()}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                  <tfoot>
+                    <tr style={{ borderTop: '2px solid #e2e8f0', background: '#f8fafc' }}>
+                      <td colSpan={3} style={{ padding: '8px', fontWeight: '700', color: '#374151' }}>TOTAL</td>
+                      <td style={{ padding: '8px', textAlign: 'right', fontWeight: '700', color: '#111' }}>
+                        ${(turnoDetalle.ventas || []).reduce((s, v) => s + parseFloat(v.total || 0), 0).toLocaleString()}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </>
+          ) : historialTurnos.length === 0 ? (
+            <p style={{ color: '#999', textAlign: 'center', padding: '32px' }}>No hay turnos registrados.</p>
+          ) : (
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                <thead>
+                  <tr style={{ background: '#f1f5f9', borderBottom: '2px solid #e2e8f0' }}>
+                    <th style={{ padding: '10px 8px', textAlign: 'left', color: '#374151' }}>Vendedor</th>
+                    <th style={{ padding: '10px 8px', textAlign: 'left', color: '#374151' }}>Inicio</th>
+                    <th style={{ padding: '10px 8px', textAlign: 'left', color: '#374151' }}>Fin</th>
+                    <th style={{ padding: '10px 8px', textAlign: 'right', color: '#374151' }}>Ventas</th>
+                    <th style={{ padding: '10px 8px', textAlign: 'right', color: '#374151' }}>Total</th>
+                    <th style={{ padding: '10px 8px', textAlign: 'center', color: '#374151' }}>Estado</th>
+                    <th style={{ padding: '10px 8px', textAlign: 'center', color: '#374151' }}>Detalle</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {historialTurnos.map((t, idx) => {
+                    const inicio = new Date(t.fecha_inicio);
+                    const fin = t.fecha_fin ? new Date(t.fecha_fin) : null;
+                    const fmt = (d) => d ? `${d.getDate().toString().padStart(2,'0')}/${(d.getMonth()+1).toString().padStart(2,'0')} ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}` : '—';
+                    return (
+                      <tr key={t.id} style={{ borderBottom: '1px solid #e2e8f0', background: idx % 2 === 0 ? '#fff' : '#fafafa' }}>
+                        <td style={{ padding: '9px 8px', fontWeight: '600', color: '#111' }}>{t.usuario_nombre || '—'}</td>
+                        <td style={{ padding: '9px 8px', color: '#374151' }}>{fmt(inicio)}</td>
+                        <td style={{ padding: '9px 8px', color: '#374151' }}>{fmt(fin)}</td>
+                        <td style={{ padding: '9px 8px', textAlign: 'right', color: '#374151' }}>{t.cantidad_ventas}</td>
+                        <td style={{ padding: '9px 8px', textAlign: 'right', fontWeight: '600', color: '#16a34a' }}>${parseFloat(t.total_ventas || 0).toLocaleString()}</td>
+                        <td style={{ padding: '9px 8px', textAlign: 'center' }}>
+                          <span style={{ display: 'inline-block', padding: '2px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: '600', background: t.estado === 'abierto' ? '#dcfce7' : '#f1f5f9', color: t.estado === 'abierto' ? '#16a34a' : '#6b7280' }}>
+                            {t.estado === 'abierto' ? 'En curso' : 'Cerrado'}
+                          </span>
+                        </td>
+                        <td style={{ padding: '9px 8px', textAlign: 'center' }}>
+                          <button onClick={() => cargarDetalleTurno(t.id)} style={{ background: '#667eea', color: 'white', border: 'none', borderRadius: '4px', padding: '3px 10px', cursor: 'pointer', fontSize: '12px' }}>Ver</button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
       ) : mostrarDashboard ? (
         <div className="dashboard-container">
           <h2 style={{ marginBottom: '16px' }}>📊 Dashboard de Ventas</h2>

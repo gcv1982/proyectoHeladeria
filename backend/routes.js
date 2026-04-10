@@ -68,6 +68,14 @@ router.post('/retiros', verificarToken, crearRetiro);
 router.get('/retiros', verificarToken, obtenerRetiros);
 router.delete('/retiros/:id', verificarToken, verificarRol(['admin']), eliminarRetiro);
 
+// ========== TURNOS ==========
+const { abrirTurno, cerrarTurno, obtenerTurnoActivo, obtenerHistorialTurnos, obtenerVentasTurno } = require('./controllers/turnos');
+router.post('/turnos', verificarToken, abrirTurno);
+router.put('/turnos/:id/cerrar', verificarToken, cerrarTurno);
+router.get('/turnos/activo', verificarToken, obtenerTurnoActivo);
+router.get('/turnos/historial', verificarToken, verificarRol(['admin']), obtenerHistorialTurnos);
+router.get('/turnos/:id/ventas', verificarToken, obtenerVentasTurno);
+
 // ========== CAJAS ==========
 const { abrirCaja, cerrarCaja, obtenerCajaAbierta, obtenerHistorialCajas } = require('./controllers/cajas');
 router.post('/cajas/abrir', verificarToken, abrirCaja);
