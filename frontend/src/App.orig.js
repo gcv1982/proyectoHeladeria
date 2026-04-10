@@ -103,7 +103,7 @@ function App() {
   { id: 69, nombre: 'Gelatinas', precio: 700, categoria: 'EXTRAS' },
 
   // ========== BEBIDAS ==========
-  { id: 70, nombre: 'Gaseosa 1.5lt', precio: 0, categoria: 'BEBIDAS' }, // Precio no especificado
+  { id: 70, nombre: 'Gaseosa 1.5lt', precio: 0, categoria: 'BEBIDAS' },
   { id: 71, nombre: 'Gaseosa 500ml', precio: 1700, categoria: 'BEBIDAS' },
   { id: 72, nombre: 'Lata', precio: 1400, categoria: 'BEBIDAS' },
   { id: 73, nombre: 'Baggio', precio: 700, categoria: 'BEBIDAS' },
@@ -483,7 +483,7 @@ const confirmarCierreCaja = () => {
   return (
   <div className="App">
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', maxWidth: '1400px', margin: '0 auto 30px' }}>
-  <h1 style={{ margin: 0 }}>🍦 Grido Laspiur</h1>
+  <h1 style={{ margin: 0 }}>Grido Laspiur</h1>
   
   <div style={{ display: 'flex', gap: '10px' }}>
     <button 
@@ -503,7 +503,7 @@ const confirmarCierreCaja = () => {
         fontFamily: 'Poppins'
       }}
     >
-      {cajaAbierta ? '💰 Caja Abierta' : '💰 Abrir Caja'}
+      {cajaAbierta ? 'Caja Abierta' : 'Abrir Caja'}
     </button>
     
     <button 
@@ -536,7 +536,7 @@ const confirmarCierreCaja = () => {
      {!cajaAbierta ? (
   // INICIO DE CAJA
   <div className="inicio-caja">
-    <h2>💰 Inicio de Caja</h2>
+    <h2>Inicio de Caja</h2>
     <p className="fecha-caja">📅 {new Date().toLocaleDateString('es-AR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
     
     <div className="denominaciones-grid">
@@ -668,7 +668,7 @@ const confirmarCierreCaja = () => {
     ) : (
   // CIERRE DE CAJA
   <div className="cierre-caja">
-    <h2>💰 Cierre de Caja</h2>
+    <h2>Cierre de Caja</h2>
     <p className="fecha-caja">📅 {new Date().toLocaleDateString('es-AR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
     
     {/* Resumen lateral */}

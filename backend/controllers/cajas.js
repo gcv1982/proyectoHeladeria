@@ -73,7 +73,26 @@ exports.obtenerHistorialCajas = async (req, res) => {
   try {
     const { limite = 30 } = req.query;
     const result = await db.query(
-      `SELECT * FROM cajas ORDER BY fecha_apertura DESC LIMIT $1`,
+      `SELECT
+         c.*,
+         u.nombre AS usuario_nombre,
+         COALESCE((
+           SELECT SUM(v.total)
+           FROM ventas v
+           WHERE v.fecha >= c.fecha_apertura
+             AND (c.fecha_cierre IS NULL OR v.fecha <= c.fecha_cierre)
+             AND v.estado != 'cancelada'
+         ), 0) AS total_ventas,
+         COALESCE((
+           SELECT SUM(r.monto)
+           FROM retiros r
+           WHERE r.fecha >= c.fecha_apertura
+             AND (c.fecha_cierre IS NULL OR r.fecha <= c.fecha_cierre)
+         ), 0) AS total_retiros
+       FROM cajas c
+       LEFT JOIN usuarios u ON c.usuario_id = u.id
+       ORDER BY c.fecha_apertura DESC
+       LIMIT $1`,
       [parseInt(limite)]
     );
     res.json({ success: true, cajas: result.rows });

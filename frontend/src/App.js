@@ -90,6 +90,8 @@ function AppInner() {
   const [mostrarGestionProductos, setMostrarGestionProductos] = useState(false);
   const [productoEditando, setProductoEditando] = useState(null);
   const [nuevoProducto, setNuevoProducto] = useState({ nombre: '', precio_unitario: '', categoria: 'GRANEL' });
+  const [mostrarHistorialCajas, setMostrarHistorialCajas] = useState(false);
+  const [historialCajas, setHistorialCajas] = useState([]);
 
   const categorias = ['GRANEL', 'POSTRES', 'CUCURUCHOS', 'PALITOS', 'TORTAS', 'FAMILIARES', 'TENTACIONES', 'BATIDOS', 'BEBIDAS', 'PROMOCIONES', 'EXTRAS', 'PIZZAS', 'SIN TACC', 'CHOCOLATES'];
 
@@ -179,6 +181,22 @@ function AppInner() {
   };
 
   // ========== FUNCIONES DE API ==========
+
+  const cargarHistorialCajas = async () => {
+    const tokenActual = localStorage.getItem('auth_token');
+    if (!tokenActual) return;
+    try {
+      const res = await fetch(`${API_URL}/cajas/historial?limite=50`, {
+        headers: { 'Authorization': `Bearer ${tokenActual}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setHistorialCajas(data.cajas || []);
+      }
+    } catch (e) {
+      console.error('Error al cargar historial de cajas:', e);
+    }
+  };
 
   const cargarProductos = async () => {
     const tokenActual = localStorage.getItem('auth_token');
@@ -1086,11 +1104,12 @@ function AppInner() {
         <h1 style={{ margin: 0, marginRight: '8px', fontSize: '14px', fontWeight: 600 }}>🍦 Grido Laspiur</h1>
           <div className="header-actions" style={{ display: 'flex', gap: 0, alignItems: 'center', marginLeft: 'auto' }}>
             <nav className="main-nav" style={{ display: 'flex', gap: '6px' }}>
-              <button className={`nav-btn ${mostrarDashboard ? 'active' : ''}`} onClick={() => { setMostrarDashboard(true); setMostrarCaja(false); setMostrarRetiros(false); }}>Dashboard</button>
-              <button className={`nav-btn ${mostrarCaja ? 'active' : ''}`} onClick={() => { setMostrarCaja(true); setMostrarDashboard(false); setMostrarRetiros(false); }}>Caja</button>
-              <button className={`nav-btn ${mostrarRetiros ? 'active' : ''}`} onClick={() => { setMostrarRetiros(true); setMostrarCaja(false); setMostrarDashboard(false); }}>Retiros</button>
-              <button className={`nav-btn`} onClick={() => { setMostrarDashboard(false); setMostrarCaja(false); setMostrarRetiros(false); setMostrarGestionProductos(false); setCategoriaActiva(null); }}>Productos</button>
-              {isAdmin && <button className={`nav-btn ${mostrarGestionProductos ? 'active' : ''}`} onClick={() => { setMostrarGestionProductos(true); setMostrarDashboard(false); setMostrarCaja(false); setMostrarRetiros(false); cargarTodosProductos(); }}>Gestión</button>}
+              <button className={`nav-btn ${mostrarDashboard ? 'active' : ''}`} onClick={() => { setMostrarDashboard(true); setMostrarCaja(false); setMostrarRetiros(false); setMostrarGestionProductos(false); setMostrarHistorialCajas(false); }}>Dashboard</button>
+              <button className={`nav-btn ${mostrarCaja ? 'active' : ''}`} onClick={() => { setMostrarCaja(true); setMostrarDashboard(false); setMostrarRetiros(false); setMostrarGestionProductos(false); setMostrarHistorialCajas(false); }}>Caja</button>
+              <button className={`nav-btn ${mostrarRetiros ? 'active' : ''}`} onClick={() => { setMostrarRetiros(true); setMostrarCaja(false); setMostrarDashboard(false); setMostrarGestionProductos(false); setMostrarHistorialCajas(false); }}>Retiros</button>
+              <button className={`nav-btn`} onClick={() => { setMostrarDashboard(false); setMostrarCaja(false); setMostrarRetiros(false); setMostrarGestionProductos(false); setMostrarHistorialCajas(false); setCategoriaActiva(null); }}>Productos</button>
+              {isAdmin && <button className={`nav-btn ${mostrarGestionProductos ? 'active' : ''}`} onClick={() => { setMostrarGestionProductos(true); setMostrarHistorialCajas(false); setMostrarDashboard(false); setMostrarCaja(false); setMostrarRetiros(false); cargarTodosProductos(); }}>Gestión</button>}
+              {isAdmin && <button className={`nav-btn ${mostrarHistorialCajas ? 'active' : ''}`} onClick={() => { setMostrarHistorialCajas(true); setMostrarGestionProductos(false); setMostrarDashboard(false); setMostrarCaja(false); setMostrarRetiros(false); cargarHistorialCajas(); }}>Cajas</button>}
             </nav>
             <div className="header-right" style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
               <button className={`btn-open-caja ${cajaAbierta ? 'open' : ''}`} onClick={() => { setMostrarDashboard(false); setMostrarCaja(true); }}>{cajaAbierta ? '💰 Caja Abierta' : '💰 Abrir Caja'}</button>
@@ -1368,6 +1387,70 @@ function AppInner() {
               ))}
             </tbody>
           </table>
+        </div>
+      ) : mostrarHistorialCajas && isAdmin ? (
+        <div style={{ padding: '16px', maxWidth: '960px', margin: '0 auto' }}>
+          <h2 style={{ marginBottom: '16px' }}>🏦 Historial de Cajas</h2>
+          {historialCajas.length === 0 ? (
+            <p style={{ color: '#999', textAlign: 'center', padding: '32px' }}>No hay cajas registradas.</p>
+          ) : (
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                <thead>
+                  <tr style={{ background: '#f1f5f9', borderBottom: '2px solid #e2e8f0' }}>
+                    <th style={{ padding: '10px 8px', textAlign: 'left', fontWeight: '600', color: '#374151' }}>#</th>
+                    <th style={{ padding: '10px 8px', textAlign: 'left', fontWeight: '600', color: '#374151' }}>Apertura</th>
+                    <th style={{ padding: '10px 8px', textAlign: 'left', fontWeight: '600', color: '#374151' }}>Cierre</th>
+                    <th style={{ padding: '10px 8px', textAlign: 'left', fontWeight: '600', color: '#374151' }}>Usuario</th>
+                    <th style={{ padding: '10px 8px', textAlign: 'right', fontWeight: '600', color: '#374151' }}>Inicio</th>
+                    <th style={{ padding: '10px 8px', textAlign: 'right', fontWeight: '600', color: '#374151' }}>Ventas</th>
+                    <th style={{ padding: '10px 8px', textAlign: 'right', fontWeight: '600', color: '#374151' }}>Retiros</th>
+                    <th style={{ padding: '10px 8px', textAlign: 'right', fontWeight: '600', color: '#374151' }}>Cierre contado</th>
+                    <th style={{ padding: '10px 8px', textAlign: 'right', fontWeight: '600', color: '#374151' }}>Diferencia</th>
+                    <th style={{ padding: '10px 8px', textAlign: 'center', fontWeight: '600', color: '#374151' }}>Estado</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {historialCajas.map((caja, idx) => {
+                    const apertura = new Date(caja.fecha_apertura);
+                    const cierre = caja.fecha_cierre ? new Date(caja.fecha_cierre) : null;
+                    const fmtFecha = (d) => d
+                      ? `${d.getDate().toString().padStart(2,'0')}/${(d.getMonth()+1).toString().padStart(2,'0')}/${d.getFullYear()} ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`
+                      : '—';
+                    const diferencia = parseFloat(caja.diferencia || 0);
+                    const difColor = diferencia > 0 ? '#16a34a' : diferencia < 0 ? '#dc2626' : '#374151';
+                    const difPrefix = diferencia > 0 ? '+' : '';
+                    return (
+                      <tr key={caja.id} style={{ borderBottom: '1px solid #e2e8f0', background: idx % 2 === 0 ? '#fff' : '#fafafa' }}>
+                        <td style={{ padding: '9px 8px', color: '#6b7280' }}>{caja.id}</td>
+                        <td style={{ padding: '9px 8px', color: '#111827' }}>{fmtFecha(apertura)}</td>
+                        <td style={{ padding: '9px 8px', color: '#111827' }}>{fmtFecha(cierre)}</td>
+                        <td style={{ padding: '9px 8px', color: '#111827' }}>{caja.usuario_nombre || '—'}</td>
+                        <td style={{ padding: '9px 8px', textAlign: 'right', color: '#111827' }}>${parseFloat(caja.monto_inicial || 0).toLocaleString()}</td>
+                        <td style={{ padding: '9px 8px', textAlign: 'right', color: '#16a34a', fontWeight: '600' }}>${parseFloat(caja.total_ventas || 0).toLocaleString()}</td>
+                        <td style={{ padding: '9px 8px', textAlign: 'right', color: '#dc2626' }}>${parseFloat(caja.total_retiros || 0).toLocaleString()}</td>
+                        <td style={{ padding: '9px 8px', textAlign: 'right', color: '#111827' }}>
+                          {caja.monto_cierre != null ? `$${parseFloat(caja.monto_cierre).toLocaleString()}` : '—'}
+                        </td>
+                        <td style={{ padding: '9px 8px', textAlign: 'right', fontWeight: '600', color: difColor }}>
+                          {caja.diferencia != null ? `${difPrefix}$${Math.abs(diferencia).toLocaleString()}` : '—'}
+                        </td>
+                        <td style={{ padding: '9px 8px', textAlign: 'center' }}>
+                          <span style={{
+                            display: 'inline-block', padding: '2px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: '600',
+                            background: caja.estado === 'abierta' ? '#dcfce7' : '#f1f5f9',
+                            color: caja.estado === 'abierta' ? '#16a34a' : '#6b7280'
+                          }}>
+                            {caja.estado === 'abierta' ? 'Abierta' : 'Cerrada'}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       ) : mostrarDashboard ? (
         <div className="dashboard-container">
