@@ -162,7 +162,7 @@
 .categoria-btn.cucuruchos-hero { background-image: url('./assets/cucuruchos.jpg'); }
 .categoria-btn.bombones-hero { background-image: url('./assets/bombones.jpg'); }
 .categoria-btn.granel-hero { background-image: url('./assets/kilo.jpeg'); }
-.categoria-btn.bebidas-hero { background-image: url('./assets/bebidas.jpeg'); background-size: 85%; background-color: white; }
+.categoria-btn.bebidas-hero { background-image: url('./assets/bebidas.jpeg'); background-size: 65%; background-color: white; background-position: center; background-repeat: no-repeat; }
 .categoria-btn.batidos-hero { background-image: url('./assets/Smoothie2.jpg'); }
 .categoria-btn.sintacc-hero { background-image: url('./assets/sin tacc.jpg'); }
 .categoria-btn.chocolates-hero { background-image: url('./assets/arcor.jpg'); }
@@ -1508,11 +1508,11 @@
 .metodo-line { font-size: 13px; color: #111827; margin-bottom: 4px; }
 
 .metodo-pago-btn {
-  padding: 14px;
+  padding: 9px 10px;
   border: none;
-  border-radius: 12px;
+  border-radius: 10px;
   cursor: pointer;
-  font-size: 16px;
+  font-size: 13px;
   font-weight: 600;
   font-family: 'Poppins', sans-serif;
   color: white;
@@ -1543,12 +1543,12 @@
 
 .modal-cancelar {
   width: 100%;
-  padding: 15px;
+  padding: 9px;
   background: transparent;
   border: 2px solid #dee2e6;
   border-radius: 10px;
   cursor: pointer;
-  font-size: 16px;
+  font-size: 13px;
   font-weight: 600;
   font-family: 'Poppins', sans-serif;
   color: #6c757d;
@@ -1563,7 +1563,7 @@
 /* Pagos seleccionados */
 .pagos-seleccionados {
   background: #f8f9fa;
-  padding: 20px;
+  padding: 20px 20px 0 20px;
   border-radius: 12px;
   margin-bottom: 20px;
 }
@@ -1633,6 +1633,7 @@
   border-top: 2px solid #dee2e6;
   font-size: 18px;
   font-weight: 600;
+  color: #111827;
 }
 
 .total-correcto {
@@ -1826,11 +1827,11 @@
   }
   
   .metodo-pago-btn {
-  padding: 14px;
+  padding: 9px 10px;
   border: none;
   border-radius: 10px;
   cursor: pointer;
-  font-size: 5px;
+  font-size: 13px;
   font-weight: 600;
   font-family: 'Poppins', sans-serif;
   color: white;

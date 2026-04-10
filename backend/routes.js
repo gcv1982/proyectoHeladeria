@@ -1,7 +1,7 @@
 
 const express = require('express');
 const router = express.Router();
-const { listarProductos } = require('./controllers/productos.js');
+const { listarProductos, crearProducto, editarProducto, desactivarProducto } = require('./controllers/productos.js');
 const { verificarToken, verificarRol } = require('./middlewares/auth');
 const { login } = require('./controllers/auth');
 const {
@@ -23,6 +23,12 @@ const {
     modificarVenta
 } = require('./controllers/ventas');
 
+const {
+    crearRetiro,
+    obtenerRetiros,
+    eliminarRetiro
+} = require('./controllers/retiros');
+
 // ========== AUTENTICACIÓN ==========
 router.post('/login', login);
 
@@ -34,6 +40,9 @@ router.delete('/usuarios/:id', verificarToken, verificarRol(['admin']), eliminar
 
 // ========== PRODUCTOS ==========
 router.get('/productos', verificarToken, listarProductos);
+router.post('/productos', verificarToken, verificarRol(['admin']), crearProducto);
+router.put('/productos/:id', verificarToken, verificarRol(['admin']), editarProducto);
+router.patch('/productos/:id/activo', verificarToken, verificarRol(['admin']), desactivarProducto);
 
 // ========== VENTAS ==========
 // Crear nueva venta
@@ -54,5 +63,16 @@ router.put('/ventas/:id', verificarToken, verificarRol(['admin', 'gerente']), mo
 // Cancelar venta
 router.put('/ventas/:id/cancelar', verificarToken, cancelarVenta);
 
+// ========== RETIROS ==========
+router.post('/retiros', verificarToken, crearRetiro);
+router.get('/retiros', verificarToken, obtenerRetiros);
+router.delete('/retiros/:id', verificarToken, verificarRol(['admin']), eliminarRetiro);
+
+// ========== CAJAS ==========
+const { abrirCaja, cerrarCaja, obtenerCajaAbierta, obtenerHistorialCajas } = require('./controllers/cajas');
+router.post('/cajas/abrir', verificarToken, abrirCaja);
+router.put('/cajas/:id/cerrar', verificarToken, verificarRol(['admin']), cerrarCaja);
+router.get('/cajas/abierta', verificarToken, obtenerCajaAbierta);
+router.get('/cajas/historial', verificarToken, verificarRol(['admin']), obtenerHistorialCajas);
 
 module.exports = router;

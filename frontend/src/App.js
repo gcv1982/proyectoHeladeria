@@ -86,109 +86,12 @@ function DenomGrid({ prefix, gridClass, totalLabel, onTotalChange, storageKey, r
 function AppInner() {
   const { user, token, role, logout } = useAuth();
 
-  const productos = [
-    { id: 7, nombre: 'Baño de Chocolate', precio: 600, categoria: 'EXTRAS' },
-    { id: 8, nombre: '1/4 kg', precio: 4500, categoria: 'GRANEL' },
-    { id: 9, nombre: '1/2 kg', precio: 7800, categoria: 'GRANEL' },
-    { id: 10, nombre: '1 kg', precio: 13500, categoria: 'GRANEL' },
-    { id: 11, nombre: 'Batido', precio: 3800, categoria: 'BATIDOS' },
-    { id: 12, nombre: 'Batido Nesquik', precio: 4200, categoria: 'BATIDOS' },
-    { id: 13, nombre: 'Sundae Go', precio: 3700, categoria: 'BATIDOS' },
-    { id: 14, nombre: 'Smoothie', precio: 4100, categoria: 'BATIDOS' },
-    { id: 15, nombre: 'Yogurt', precio: 2600, categoria: 'SIN TACC' },
-    { id: 16, nombre: 'Helado s/Az', precio: 2600, categoria: 'SIN TACC' },
-    { id: 17, nombre: 'Postre Veg', precio: 2600, categoria: 'SIN TACC' },
-    { id: 18, nombre: 'Almendrado x1', precio: 1600, categoria: 'POSTRES' },
-    { id: 19, nombre: 'Almendrado x 8', precio: 9500, categoria: 'POSTRES' },
-    { id: 20, nombre: 'Cassatta x 1', precio: 1600, categoria: 'POSTRES' },
-    { id: 21, nombre: 'Cassatta x 8', precio: 9500, categoria: 'POSTRES' },
-    { id: 22, nombre: 'Crocante x 1', precio: 1600, categoria: 'POSTRES' },
-    { id: 23, nombre: 'Crocante x 8', precio: 11000, categoria: 'POSTRES' },
-    { id: 24, nombre: 'Frutezza x 1', precio: 1600, categoria: 'POSTRES' },
-    { id: 25, nombre: 'Frutezza x 8', precio: 11000, categoria: 'POSTRES' },
-    { id: 26, nombre: 'Suizo x 1', precio: 1700, categoria: 'POSTRES' },
-    { id: 27, nombre: 'Suizo x 8', precio: 12000, categoria: 'POSTRES' },
-    { id: 28, nombre: 'Escocés x 1', precio: 1800, categoria: 'POSTRES' },
-    { id: 29, nombre: 'Escocés x 8', precio: 12500, categoria: 'POSTRES' },
-    { id: 30, nombre: 'Alfajor Secreto x 1', precio: 2200, categoria: 'POSTRES' },
-    { id: 31, nombre: 'Alfajor Secreto x 6', precio: 12500, categoria: 'POSTRES' },
-    { id: 32, nombre: 'Crocantino', precio: 9500, categoria: 'POSTRES' },
-    { id: 33, nombre: 'Delicias', precio: 9500, categoria: 'POSTRES' },
-    { id: 93, nombre: 'Chocolate', precio: 7500, categoria: 'TENTACIONES' },
-    { id: 99, nombre: 'Crema Americana', precio: 7500, categoria: 'TENTACIONES' },
-    { id: 102, nombre: 'Crema Cookie', precio: 7500, categoria: 'TENTACIONES' },
-    { id: 96, nombre: 'Dulce de Leche', precio: 7500, categoria: 'TENTACIONES' },
-    { id: 97, nombre: 'Dulce de Leche Granizado', precio: 7500, categoria: 'TENTACIONES' },
-    { id: 100, nombre: 'Frutilla', precio: 7500, categoria: 'TENTACIONES' },
-    { id: 95, nombre: 'Granizado', precio: 7500, categoria: 'TENTACIONES' },
-    { id: 98, nombre: 'Limón', precio: 7500, categoria: 'TENTACIONES' },
-    { id: 94, nombre: 'Menta Granizado', precio: 7500, categoria: 'TENTACIONES' },
-    { id: 101, nombre: 'Vainilla', precio: 7500, categoria: 'TENTACIONES' },
-    { id: 103, nombre: '1 Bocha', precio: 2400, categoria: 'CUCURUCHOS' },
-    { id: 104, nombre: '2 Bochas', precio: 3100, categoria: 'CUCURUCHOS' },
-    { id: 105, nombre: '3 Bochas', precio: 3400, categoria: 'CUCURUCHOS' },
-    { id: 106, nombre: 'GRIDO 2 Bochas', precio: 3300, categoria: 'CUCURUCHOS' },
-    { id: 107, nombre: 'GRIDO 3 Bochas', precio: 3700, categoria: 'CUCURUCHOS' },
-    { id: 108, nombre: 'Super Gridito', precio: 2500, categoria: 'CUCURUCHOS' },
-    { id: 36, nombre: 'Palito Bombón x1', precio: 1000, categoria: 'PALITOS' },
-    { id: 37, nombre: 'Palito Bombón x10', precio: 7000, categoria: 'PALITOS' },
-    { id: 38, nombre: 'Palito Bombón x20', precio: 14000, categoria: 'PALITOS' },
-    { id: 39, nombre: 'Palito Cremoso x1', precio: 900, categoria: 'PALITOS' },
-    { id: 40, nombre: 'Palito Cremoso x10', precio: 5500, categoria: 'PALITOS' },
-    { id: 41, nombre: 'Palito Cremoso x20', precio: 11000, categoria: 'PALITOS' },
-    { id: 42, nombre: 'Palito Frutal x1', precio: 800, categoria: 'PALITOS' },
-    { id: 43, nombre: 'Palito Frutal x10', precio: 5000, categoria: 'PALITOS' },
-    { id: 44, nombre: 'Palito Frutal x20', precio: 10000, categoria: 'PALITOS' },
-    { id: 45, nombre: 'Torta Frutilla', precio: 14000, categoria: 'TORTAS' },
-    { id: 86, nombre: 'Torta Grido', precio: 14000, categoria: 'TORTAS' },
-    { id: 87, nombre: 'Torta Oreo', precio: 14000, categoria: 'TORTAS' },
-    { id: 46, nombre: 'Pizza Mozzarella', precio: 5800, categoria: 'PIZZAS' },
-    { id: 47, nombre: 'Pizza Jamón', precio: 6200, categoria: 'PIZZAS' },
-    { id: 48, nombre: 'Pizza Cebolla', precio: 5800, categoria: 'PIZZAS' },
-    { id: 49, nombre: 'Pizza Casera', precio: 8200, categoria: 'PIZZAS' },
-    { id: 50, nombre: 'Mini Pizza', precio: 3100, categoria: 'PIZZAS' },
-    { id: 51, nombre: 'Bastones', precio: 5300, categoria: 'PIZZAS' },
-    { id: 52, nombre: 'Pechugas', precio: 5300, categoria: 'PIZZAS' },
-    { id: 53, nombre: 'Empanadas', precio: 7800, categoria: 'PIZZAS' },
-    { id: 54, nombre: 'Blister x3', precio: 1000, categoria: 'EXTRAS' },
-    { id: 55, nombre: 'Topping x1', precio: 550, categoria: 'EXTRAS' },
-    { id: 56, nombre: 'Topping x2', precio: 1000, categoria: 'EXTRAS' },
-    { id: 57, nombre: 'Salsita 15gr', precio: 550, categoria: 'EXTRAS' },
-    { id: 58, nombre: 'Bengala Común', precio: 600, categoria: 'EXTRAS' },
-    { id: 59, nombre: 'Bengala Brillo', precio: 1000, categoria: 'EXTRAS' },
-    { id: 60, nombre: 'Block 38gr', precio: 1400, categoria: 'CHOCOLATES' },
-    { id: 61, nombre: 'Block 110gr', precio: 4200, categoria: 'CHOCOLATES' },
-    { id: 62, nombre: 'Block 170gr', precio: 7000, categoria: 'CHOCOLATES' },
-    { id: 63, nombre: 'Block 300gr', precio: 10800, categoria: 'CHOCOLATES' },
-    { id: 64, nombre: 'Graffiti 45gr', precio: 1500, categoria: 'CHOCOLATES' },
-    { id: 65, nombre: 'Roclets 40gr', precio: 1400, categoria: 'CHOCOLATES' },
-    { id: 66, nombre: 'Maní c/Choco', precio: 1100, categoria: 'CHOCOLATES' },
-    { id: 67, nombre: 'Cofler Tofi/Bon', precio: 800, categoria: 'CHOCOLATES' },
-    { id: 68, nombre: 'Cofler 55gr', precio: 2700, categoria: 'CHOCOLATES' },
-    { id: 69, nombre: 'Gelatinas', precio: 700, categoria: 'CHOCOLATES' },
-    { id: 70, nombre: 'Gaseosa 1.5lt', precio: 0, categoria: 'BEBIDAS' },
-    { id: 71, nombre: 'Gaseosa 500ml', precio: 2000, categoria: 'BEBIDAS' },
-    { id: 72, nombre: 'Lata', precio: 1700, categoria: 'BEBIDAS' },
-    { id: 73, nombre: 'Baggio', precio: 800, categoria: 'BEBIDAS' },
-    { id: 74, nombre: 'Agua 500ml', precio: 1000, categoria: 'BEBIDAS' },
-    { id: 75, nombre: 'Agua 2lt', precio: 2000, categoria: 'BEBIDAS' },
-    { id: 76, nombre: '2 de 2 Bochas', precio: 6000, categoria: 'PROMOCIONES' },
-    { id: 77, nombre: '2 de 1/4', precio: 8500, categoria: 'PROMOCIONES' },
-    { id: 78, nombre: 'kg + medio', precio: 19800, categoria: 'PROMOCIONES' },
-    { id: 79, nombre: '2 Kilos', precio: 25000, categoria: 'PROMOCIONES' },
-    { id: 80, nombre: '2 Bocha TOY', precio: 4100, categoria: 'PROMOCIONES' },
-    { id: 81, nombre: '3x2 Alm o Cas', precio: 19000, categoria: 'PROMOCIONES' },
-    { id: 82, nombre: '2 Escocés', precio: 23000, categoria: 'PROMOCIONES' },
-    { id: 83, nombre: 'Kilo Reutilizable', precio: 22500, categoria: 'PROMOCIONES' },
-    { id: 84, nombre: 'Recarga Kilo', precio: 12200, categoria: 'PROMOCIONES' },
-    { id: 85, nombre: 'Recarga Medio kilo', precio: 7000, categoria: 'PROMOCIONES' },
-    { id: 89, nombre: 'Familiar nro 1', precio: 14500, categoria: 'FAMILIARES' },
-    { id: 90, nombre: 'Familiar nro 2', precio: 14500, categoria: 'FAMILIARES' },
-    { id: 91, nombre: 'Familiar nro 3', precio: 14500, categoria: 'FAMILIARES' },
-    { id: 92, nombre: 'Familiar nro 4', precio: 14500, categoria: 'FAMILIARES' }
-  ];
+  const [productos, setProductos] = useState([]);
+  const [mostrarGestionProductos, setMostrarGestionProductos] = useState(false);
+  const [productoEditando, setProductoEditando] = useState(null);
+  const [nuevoProducto, setNuevoProducto] = useState({ nombre: '', precio_unitario: '', categoria: 'GRANEL' });
 
-  const categorias = ['GRANEL', 'POSTRES', 'CUCURUCHOS', 'PALITOS', 'TORTAS', 'FAMILIARES', 'TENTACIONES',  'BATIDOS', 'PROMOCIONES', 'EXTRAS', 'PIZZAS', 'SIN TACC', 'CHOCOLATES'];
+  const categorias = ['GRANEL', 'POSTRES', 'CUCURUCHOS', 'PALITOS', 'TORTAS', 'FAMILIARES', 'TENTACIONES', 'BATIDOS', 'BEBIDAS', 'PROMOCIONES', 'EXTRAS', 'PIZZAS', 'SIN TACC', 'CHOCOLATES'];
 
   const [carrito, setCarrito] = useState([]);
   const [seleccionado, setSeleccionado] = useState(null);
@@ -204,6 +107,7 @@ function AppInner() {
   const [mostrarCaja, setMostrarCaja] = useState(false);
   const [cajaAbierta, setCajaAbierta] = useState(false);
   const [inicioCaja, setInicioCaja] = useState(null);
+  const [cajaId, setCajaId] = useState(null);
   const [ventasDelDia, setVentasDelDia] = useState([]);
   // Refs a los componentes DenomGrid (manejan su propio estado)
   const denomInicioRef = useRef();
@@ -238,8 +142,6 @@ function AppInner() {
 
   useEffect(() => {
     try {
-      const storedRetiros = localStorage.getItem('retiros');
-      if (storedRetiros) setRetiros(JSON.parse(storedRetiros));
       const storedGastos = localStorage.getItem('gastos');
       if (storedGastos) setGastos(JSON.parse(storedGastos));
     } catch (e) {
@@ -249,7 +151,6 @@ function AppInner() {
 
   useEffect(() => {
     try {
-      localStorage.setItem('retiros', JSON.stringify(retiros));
       localStorage.setItem('gastos', JSON.stringify(gastos));
     } catch (e) {
       // ignore
@@ -278,6 +179,23 @@ function AppInner() {
   };
 
   // ========== FUNCIONES DE API ==========
+
+  const cargarProductos = async () => {
+    const tokenActual = localStorage.getItem('auth_token');
+    if (!tokenActual) return;
+    try {
+      const res = await fetch(`${API_URL}/productos`, {
+        headers: { 'Authorization': `Bearer ${tokenActual}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setProductos(data.map(p => ({ ...p, precio: parseFloat(p.precio_unitario) })));
+      }
+    } catch (e) {
+      console.error('Error al cargar productos:', e);
+    }
+  };
+
   const apiGuardarVenta = async (venta) => {
     if (!user) {
       console.error('❌ No hay usuario en sesión');
@@ -452,11 +370,13 @@ function AppInner() {
   };
 
   // Actualizar ventas cuando se muestre el dashboard
-  // Cargar ventas de hoy al iniciar sesión (para la caja)
+  // Cargar ventas, retiros y productos al iniciar sesión
   useEffect(() => {
     if (user && token) {
       const hoy = new Date();
       apiCargarVentasDelDia(hoy.getMonth(), hoy.getFullYear());
+      cargarRetiros();
+      cargarProductos();
     }
   }, [user, token]);
 
@@ -469,7 +389,25 @@ function AppInner() {
     }
   }, [user, token, mostrarDashboard, calMes, calAño]);
 
-  const agregarRetiro = () => {
+  const cargarRetiros = async () => {
+    const tokenActual = localStorage.getItem('auth_token');
+    if (!tokenActual) return;
+    try {
+      const hoy = new Date();
+      const fecha = `${hoy.getFullYear()}-${String(hoy.getMonth()+1).padStart(2,'0')}-${String(hoy.getDate()).padStart(2,'0')}`;
+      const res = await fetch(`${API_URL}/retiros?fecha_inicio=${fecha}&fecha_fin=${fecha}`, {
+        headers: { 'Authorization': `Bearer ${tokenActual}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setRetiros(data.retiros || []);
+      }
+    } catch (e) {
+      console.error('Error al cargar retiros:', e);
+    }
+  };
+
+  const agregarRetiro = async () => {
     const monto = parseFloat(nuevoRetiroMonto);
     if (!monto || monto <= 0) { alert('Ingrese un monto válido para el retiro'); return; }
     const hoyStr = (() => { const h = new Date(); return `${h.getFullYear()}-${String(h.getMonth()+1).padStart(2,'0')}-${String(h.getDate()).padStart(2,'0')}`; })();
@@ -481,10 +419,23 @@ function AppInner() {
       alert(`El monto excede el efectivo disponible ($${montoDisponible.toLocaleString()}). No se puede registrar el retiro.`);
       return;
     }
-    const nuevo = { monto, descripcion: nuevoRetiroDesc || 'Retiro', fecha: new Date().toISOString(), usuario: user?.nombre || null };
-    setRetiros([...retiros, nuevo]);
-    setNuevoRetiroMonto('');
-    setNuevoRetiroDesc('');
+    const tokenActual = localStorage.getItem('auth_token');
+    try {
+      const res = await fetch(`${API_URL}/retiros`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${tokenActual}` },
+        body: JSON.stringify({ usuario_id: user.id, monto, descripcion: nuevoRetiroDesc || 'Retiro' })
+      });
+      if (res.ok) {
+        await cargarRetiros();
+        setNuevoRetiroMonto('');
+        setNuevoRetiroDesc('');
+      } else {
+        alert('Error al guardar el retiro');
+      }
+    } catch (e) {
+      alert('Error de conexión');
+    }
   };
 
   const iniciarEdicionRetiro = (idx) => {
@@ -545,12 +496,87 @@ function AppInner() {
     alert(`Ingreso registrado: $${monto.toLocaleString()} (${ingresoMetodo})`);
   };
 
-  const eliminarRetiro = (idx) => {
+  const eliminarRetiro = async (idx) => {
     if (!isAdmin) { alert('No tiene permisos para eliminar retiros'); return; }
     if (!window.confirm('¿Eliminar este retiro?')) return;
-    const copia = [...retiros];
-    copia.splice(idx, 1);
-    setRetiros(copia);
+    const retiro = retiros[idx];
+    const tokenActual = localStorage.getItem('auth_token');
+    try {
+      const res = await fetch(`${API_URL}/retiros/${retiro.id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${tokenActual}` }
+      });
+      if (res.ok) {
+        await cargarRetiros();
+      } else {
+        alert('Error al eliminar el retiro');
+      }
+    } catch (e) {
+      alert('Error de conexión');
+    }
+  };
+
+  const [todosProductos, setTodosProductos] = useState([]);
+
+  const cargarTodosProductos = async () => {
+    const tokenActual = localStorage.getItem('auth_token');
+    if (!tokenActual) return;
+    try {
+      const res = await fetch(`${API_URL}/productos?todos=true`, {
+        headers: { 'Authorization': `Bearer ${tokenActual}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setTodosProductos(data);
+      }
+    } catch (e) { console.error('Error:', e); }
+  };
+
+  const guardarProducto = async () => {
+    const tokenActual = localStorage.getItem('auth_token');
+    const { nombre, precio_unitario, categoria } = nuevoProducto;
+    if (!nombre.trim() || !precio_unitario || !categoria) { alert('Completá todos los campos'); return; }
+    try {
+      const res = await fetch(`${API_URL}/productos`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${tokenActual}` },
+        body: JSON.stringify({ nombre, precio_unitario: parseFloat(precio_unitario), categoria })
+      });
+      if (res.ok) {
+        await cargarProductos(); await cargarTodosProductos();
+        setNuevoProducto({ nombre: '', precio_unitario: '', categoria: 'GRANEL' });
+      } else { alert('Error al guardar producto'); }
+    } catch (e) { alert('Error de conexión'); }
+  };
+
+  const guardarEdicionProducto = async () => {
+    const tokenActual = localStorage.getItem('auth_token');
+    const { id, nombre, precio_unitario, categoria } = productoEditando;
+    if (!nombre.trim() || !precio_unitario) { alert('Completá todos los campos'); return; }
+    try {
+      const res = await fetch(`${API_URL}/productos/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${tokenActual}` },
+        body: JSON.stringify({ nombre, precio_unitario: parseFloat(precio_unitario), categoria })
+      });
+      if (res.ok) {
+        await cargarProductos(); await cargarTodosProductos();
+        setProductoEditando(null);
+      } else { alert('Error al editar producto'); }
+    } catch (e) { alert('Error de conexión'); }
+  };
+
+  const toggleActivoProducto = async (producto) => {
+    const tokenActual = localStorage.getItem('auth_token');
+    try {
+      const res = await fetch(`${API_URL}/productos/${producto.id}/activo`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${tokenActual}` },
+        body: JSON.stringify({ activo: !producto.activo })
+      });
+      if (res.ok) { await cargarProductos(); await cargarTodosProductos(); }
+      else alert('Error al actualizar producto');
+    } catch (e) { alert('Error de conexión'); }
   };
 
   const exportarRetirosCSV = () => {
@@ -596,8 +622,10 @@ function AppInner() {
     try {
       const open = localStorage.getItem('cajaAbierta') === 'true';
       const inicio = localStorage.getItem('inicioCaja');
+      const idCaja = localStorage.getItem('cajaId');
       setCajaAbierta(open);
       setInicioCaja(inicio ? JSON.parse(inicio) : null);
+      if (idCaja) setCajaId(Number(idCaja));
       if (!open) setMostrarCaja(false);
     } catch (e) {
       // ignore
@@ -962,12 +990,26 @@ function AppInner() {
 
   const totalCarrito = carrito.reduce((total, item) => total + (item.precio * item.cantidad), 0);
 
-  const confirmarInicioCaja = () => {
+  const confirmarInicioCaja = async () => {
     const total = denomInicioRef.current?.getTotal() ?? 0;
     if (total === 0) { alert('Debe ingresar al menos una denominación'); return; }
     const v = denomInicioRef.current.getValues();
     const denominaciones = { billete20000: v.d20000, billete10000: v.d10000, billete2000: v.d2000, billete1000: v.d1000, billete500: v.d500, billete200: v.d200, billete100: v.d100, moneda50: v.d50, moneda20: v.d20, moneda10: v.d10 };
     const datosCaja = { fecha: new Date().toISOString(), montoInicial: total, denominaciones, iniciadoPor: user?.username ?? null };
+    const tokenActual = localStorage.getItem('auth_token');
+    try {
+      const res = await fetch(`${API_URL}/cajas/abrir`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${tokenActual}` },
+        body: JSON.stringify({ usuario_id: user.id, monto_inicial: total, denominaciones_inicio: denominaciones })
+      });
+      const data = await res.json();
+      if (!res.ok) { alert(data.error || 'Error al abrir caja'); return; }
+      setCajaId(data.caja.id);
+      localStorage.setItem('cajaId', String(data.caja.id));
+    } catch (e) {
+      alert('Error de conexión al abrir caja'); return;
+    }
     setInicioCaja(datosCaja);
     setCajaAbierta(true);
     setMostrarCaja(false);
@@ -997,11 +1039,33 @@ function AppInner() {
     return { montoInicial, totalVentas, retiros: retirosSum, gastos: gastosSum, totalEsperado, totalReal, diferencia };
   };
 
-  const confirmarCierreCaja = () => {
+  const confirmarCierreCaja = async () => {
     const resumen = calcularResumenCaja();
+    const tokenActual = localStorage.getItem('auth_token');
+    const idCaja = cajaId || localStorage.getItem('cajaId');
+    if (idCaja) {
+      try {
+        const denomCierre = denomCierreRef.current?.getValues() || {};
+        await fetch(`${API_URL}/cajas/${idCaja}/cerrar`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${tokenActual}` },
+          body: JSON.stringify({
+            monto_cierre: resumen.totalReal,
+            denominaciones_cierre: denomCierre,
+            diferencia: resumen.diferencia,
+            total_ventas: resumen.totalVentas,
+            total_retiros: resumen.retiros,
+            total_gastos: resumen.gastos
+          })
+        });
+      } catch (e) {
+        console.error('Error al cerrar caja en BD:', e);
+      }
+    }
     alert(`Cierre de caja\n\nEsperado: $${resumen.totalEsperado.toLocaleString()}\nReal: $${resumen.totalReal.toLocaleString()}\nRetiros: $${resumen.retiros.toLocaleString()}\nGastos: $${resumen.gastos.toLocaleString()}\nDiferencia: $${resumen.diferencia.toLocaleString()}`);
     setCajaAbierta(false);
     setMostrarCaja(false);
+    setCajaId(null);
     setCierreKey(k => k + 1);
     setCierreTotalContado(0);
     setVentasDelDia([]);
@@ -1010,11 +1074,11 @@ function AppInner() {
     setGastos([]);
     localStorage.removeItem('cajaAbierta');
     localStorage.removeItem('inicioCaja');
+    localStorage.removeItem('cajaId');
     localStorage.removeItem('retiros');
     localStorage.removeItem('gastos');
     localStorage.removeItem('cierre-denominaciones');
-
-};
+  };
 
   return (
     <div className="App">
@@ -1025,7 +1089,8 @@ function AppInner() {
               <button className={`nav-btn ${mostrarDashboard ? 'active' : ''}`} onClick={() => { setMostrarDashboard(true); setMostrarCaja(false); setMostrarRetiros(false); }}>Dashboard</button>
               <button className={`nav-btn ${mostrarCaja ? 'active' : ''}`} onClick={() => { setMostrarCaja(true); setMostrarDashboard(false); setMostrarRetiros(false); }}>Caja</button>
               <button className={`nav-btn ${mostrarRetiros ? 'active' : ''}`} onClick={() => { setMostrarRetiros(true); setMostrarCaja(false); setMostrarDashboard(false); }}>Retiros</button>
-              <button className={`nav-btn`} onClick={() => { setMostrarDashboard(false); setMostrarCaja(false); setMostrarRetiros(false); setCategoriaActiva(null); }}>Productos</button>
+              <button className={`nav-btn`} onClick={() => { setMostrarDashboard(false); setMostrarCaja(false); setMostrarRetiros(false); setMostrarGestionProductos(false); setCategoriaActiva(null); }}>Productos</button>
+              {isAdmin && <button className={`nav-btn ${mostrarGestionProductos ? 'active' : ''}`} onClick={() => { setMostrarGestionProductos(true); setMostrarDashboard(false); setMostrarCaja(false); setMostrarRetiros(false); cargarTodosProductos(); }}>Gestión</button>}
             </nav>
             <div className="header-right" style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
               <button className={`btn-open-caja ${cajaAbierta ? 'open' : ''}`} onClick={() => { setMostrarDashboard(false); setMostrarCaja(true); }}>{cajaAbierta ? '💰 Caja Abierta' : '💰 Abrir Caja'}</button>
@@ -1238,6 +1303,71 @@ function AppInner() {
               )}
             </div>
           </div>
+        </div>
+      ) : mostrarGestionProductos && isAdmin ? (
+        <div style={{ padding: '16px', maxWidth: '900px', margin: '0 auto' }}>
+          <h2 style={{ marginBottom: '16px' }}>⚙️ Gestión de Productos</h2>
+
+          {/* Formulario nuevo producto */}
+          <div style={{ background: '#f8f9fa', border: '1px solid #ddd', borderRadius: '8px', padding: '16px', marginBottom: '24px' }}>
+            <h3 style={{ margin: '0 0 12px', fontSize: '14px' }}>Agregar nuevo producto</h3>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              <input value={nuevoProducto.nombre} onChange={e => setNuevoProducto(p => ({ ...p, nombre: e.target.value }))} placeholder="Nombre" style={{ flex: 2, padding: '6px 10px', border: '1px solid #ccc', borderRadius: '6px', fontSize: '13px', minWidth: '150px' }} />
+              <input type="number" value={nuevoProducto.precio_unitario} onChange={e => setNuevoProducto(p => ({ ...p, precio_unitario: e.target.value }))} placeholder="Precio" style={{ flex: 1, padding: '6px 10px', border: '1px solid #ccc', borderRadius: '6px', fontSize: '13px', minWidth: '80px' }} />
+              <select value={nuevoProducto.categoria} onChange={e => setNuevoProducto(p => ({ ...p, categoria: e.target.value }))} style={{ flex: 1, padding: '6px', border: '1px solid #ccc', borderRadius: '6px', fontSize: '13px', minWidth: '100px' }}>
+                {categorias.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+              <button onClick={guardarProducto} style={{ background: '#48bb78', color: 'white', border: 'none', borderRadius: '6px', padding: '6px 16px', cursor: 'pointer', fontWeight: 600, fontSize: '13px' }}>+ Agregar</button>
+            </div>
+          </div>
+
+          {/* Lista de productos */}
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+            <thead>
+              <tr style={{ background: '#f0f0f0', borderBottom: '2px solid #ddd' }}>
+                <th style={{ padding: '8px', textAlign: 'left' }}>Nombre</th>
+                <th style={{ padding: '8px', textAlign: 'left' }}>Categoría</th>
+                <th style={{ padding: '8px', textAlign: 'right' }}>Precio</th>
+                <th style={{ padding: '8px', textAlign: 'center' }}>Estado</th>
+                <th style={{ padding: '8px', textAlign: 'center' }}>Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {todosProductos.map(p => (
+                <tr key={p.id} style={{ borderBottom: '1px solid #eee', opacity: p.activo ? 1 : 0.5 }}>
+                  {productoEditando?.id === p.id ? (
+                    <>
+                      <td style={{ padding: '6px' }}><input value={productoEditando.nombre} onChange={e => setProductoEditando(pe => ({ ...pe, nombre: e.target.value }))} style={{ width: '100%', padding: '4px', border: '1px solid #ccc', borderRadius: '4px', fontSize: '12px' }} /></td>
+                      <td style={{ padding: '6px' }}>
+                        <select value={productoEditando.categoria} onChange={e => setProductoEditando(pe => ({ ...pe, categoria: e.target.value }))} style={{ padding: '4px', border: '1px solid #ccc', borderRadius: '4px', fontSize: '12px' }}>
+                          {categorias.map(c => <option key={c} value={c}>{c}</option>)}
+                        </select>
+                      </td>
+                      <td style={{ padding: '6px' }}><input type="number" value={productoEditando.precio_unitario} onChange={e => setProductoEditando(pe => ({ ...pe, precio_unitario: e.target.value }))} style={{ width: '80px', padding: '4px', border: '1px solid #ccc', borderRadius: '4px', fontSize: '12px', textAlign: 'right' }} /></td>
+                      <td style={{ padding: '6px', textAlign: 'center' }}>—</td>
+                      <td style={{ padding: '6px', textAlign: 'center' }}>
+                        <button onClick={guardarEdicionProducto} style={{ background: '#48bb78', color: 'white', border: 'none', borderRadius: '4px', padding: '3px 8px', cursor: 'pointer', fontSize: '12px', marginRight: '4px' }}>✓</button>
+                        <button onClick={() => setProductoEditando(null)} style={{ background: '#e2e8f0', color: '#4a5568', border: 'none', borderRadius: '4px', padding: '3px 8px', cursor: 'pointer', fontSize: '12px' }}>✕</button>
+                      </td>
+                    </>
+                  ) : (
+                    <>
+                      <td style={{ padding: '8px' }}>{p.nombre}</td>
+                      <td style={{ padding: '8px', color: '#666' }}>{p.categoria}</td>
+                      <td style={{ padding: '8px', textAlign: 'right', fontWeight: 600 }}>${parseFloat(p.precio_unitario).toLocaleString()}</td>
+                      <td style={{ padding: '8px', textAlign: 'center' }}>
+                        <span style={{ background: p.activo ? '#c6f6d5' : '#fed7d7', color: p.activo ? '#276749' : '#9b2c2c', borderRadius: '12px', padding: '2px 8px', fontSize: '11px' }}>{p.activo ? 'Activo' : 'Inactivo'}</span>
+                      </td>
+                      <td style={{ padding: '8px', textAlign: 'center' }}>
+                        <button onClick={() => setProductoEditando({ id: p.id, nombre: p.nombre, precio_unitario: p.precio_unitario, categoria: p.categoria })} style={{ background: '#667eea', color: 'white', border: 'none', borderRadius: '4px', padding: '3px 8px', cursor: 'pointer', fontSize: '12px', marginRight: '4px' }}>Editar</button>
+                        <button onClick={() => toggleActivoProducto(p)} style={{ background: p.activo ? '#e53e3e' : '#48bb78', color: 'white', border: 'none', borderRadius: '4px', padding: '3px 8px', cursor: 'pointer', fontSize: '12px' }}>{p.activo ? 'Desactivar' : 'Activar'}</button>
+                      </td>
+                    </>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       ) : mostrarDashboard ? (
         <div className="dashboard-container">
