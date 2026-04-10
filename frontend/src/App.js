@@ -270,6 +270,13 @@ function AppInner() {
   // Determinar si el usuario tiene permisos de administrador para retiros
   const isAdmin = role && typeof role === 'string' && role.toLowerCase().includes('admin');
 
+  // Convierte una fecha UTC a fecha local en formato YYYY-MM-DD
+  const fechaLocal = (fechaStr) => {
+    if (!fechaStr) return '';
+    const d = new Date(fechaStr);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  };
+
   // ========== FUNCIONES DE API ==========
   const apiGuardarVenta = async (venta) => {
     if (!user) {
@@ -445,6 +452,15 @@ function AppInner() {
   };
 
   // Actualizar ventas cuando se muestre el dashboard
+  // Cargar ventas de hoy al iniciar sesión (para la caja)
+  useEffect(() => {
+    if (user && token) {
+      const hoy = new Date();
+      apiCargarVentasDelDia(hoy.getMonth(), hoy.getFullYear());
+    }
+  }, [user, token]);
+
+  // Cargar ventas del mes visible al entrar al dashboard o cambiar de mes
   useEffect(() => {
     if (user && token && mostrarDashboard) {
       apiCargarVentasDelDia(calMes, calAño);
@@ -456,8 +472,9 @@ function AppInner() {
   const agregarRetiro = () => {
     const monto = parseFloat(nuevoRetiroMonto);
     if (!monto || monto <= 0) { alert('Ingrese un monto válido para el retiro'); return; }
-    const montoDisponible = (inicioCaja ? inicioCaja.montoInicial : 0) + ventasDelDia.reduce((s, v) => {
-      const efectivo = (v.pagos || []).reduce((ps, p) => p.metodo === 'EFECTIVO' ? ps + (p.monto || 0) : ps, 0);
+    const hoyStr = (() => { const h = new Date(); return `${h.getFullYear()}-${String(h.getMonth()+1).padStart(2,'0')}-${String(h.getDate()).padStart(2,'0')}`; })();
+    const montoDisponible = (inicioCaja ? inicioCaja.montoInicial : 0) + ventasDelDia.filter(v => fechaLocal(v.fecha) === hoyStr).reduce((s, v) => {
+      const efectivo = (v.pagos || []).reduce((ps, p) => p.metodo === 'EFECTIVO' ? ps + (parseFloat(p.monto) || 0) : ps, 0);
       return s + efectivo;
     }, 0) - sumarRetiros();
     if (monto > montoDisponible) {
@@ -786,7 +803,7 @@ function AppInner() {
     if (periodoSeleccionado === 'HOY') {
       const yyyy = hoy.getFullYear(); const mm = String(hoy.getMonth() + 1).padStart(2, '0'); const dd = String(hoy.getDate()).padStart(2, '0');
       const fechaStr = `${yyyy}-${mm}-${dd}`;
-      return ventasDelDia.filter(v => (v.fecha || '').slice(0,10) === fechaStr);
+      return ventasDelDia.filter(v => fechaLocal(v.fecha) === fechaStr);
     } else if (periodoSeleccionado === 'SEMANA') {
       const inicioSemana = new Date(hoy);
       inicioSemana.setDate(hoy.getDate() - 7);
@@ -864,7 +881,7 @@ function AppInner() {
   const generarReporteDiario = () => {
     const reportePorDia = {};
     (ventasDelDia || []).forEach(v => {
-      const fecha = (v.fecha || '').slice(0, 10); // YYYY-MM-DD
+      const fecha = fechaLocal(v.fecha);
       if (!reportePorDia[fecha]) {
         reportePorDia[fecha] = { fecha, total: 0, cantidad: 0, productos: {} };
       }
@@ -961,10 +978,13 @@ function AppInner() {
 
   const calcularResumenCaja = () => {
     const montoInicial = inicioCaja ? inicioCaja.montoInicial : 0;
-    // Sumar SOLO el efectivo, no transferencias ni débitos
-    const totalVentas = ventasDelDia.reduce((sum, v) => {
+    const hoy = new Date();
+    const fechaHoy = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`;
+    const ventasHoy = ventasDelDia.filter(v => fechaLocal(v.fecha) === fechaHoy);
+    // Sumar SOLO el efectivo de hoy, no transferencias ni débitos
+    const totalVentas = ventasHoy.reduce((sum, v) => {
       const efectivoDelVenta = v.pagos?.reduce((pSum, p) => {
-        return p.metodo === 'EFECTIVO' ? pSum + (p.monto || 0) : pSum;
+        return p.metodo === 'EFECTIVO' ? pSum + (parseFloat(p.monto) || 0) : pSum;
       }, 0) || 0;
       return sum + efectivoDelVenta;
     }, 0);
@@ -1063,7 +1083,10 @@ function AppInner() {
                   <div className="resumen-item"><span>Inicio de Caja:</span><span className="monto">${calcularResumenCaja().montoInicial.toLocaleString()}</span></div>
                   <div className="resumen-item"><span>Ventas del Día:</span><span className="monto positivo">${calcularResumenCaja().totalVentas.toLocaleString()}</span></div>
                   {(() => {
-  const medios = calcularMetricasMedios();
+  const hoy = new Date();
+  const fechaHoy = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`;
+  const ventasHoy = ventasDelDia.filter(v => fechaLocal(v.fecha) === fechaHoy);
+  const medios = calcularMetricasMedios(ventasHoy);
   return medios.lista.length > 0 ? (
     <div className="resumen-medios">
       <h4>Medios de Pago</h4>
@@ -1394,7 +1417,7 @@ function AppInner() {
                         ))}
                         {Array.from({ length: diasDelMes }, (_, i) => i + 1).map(dia => {
                           const fechaString = `${año}-${String(mes + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
-                          const ventasEnEsteDia = ventasDelDia.filter(v => (v.fecha || '').slice(0, 10) === fechaString);
+                          const ventasEnEsteDia = ventasDelDia.filter(v => fechaLocal(v.fecha) === fechaString);
                           const tieneVentas = ventasEnEsteDia.length > 0;
                           const estaSeleccionado = diaSeleccionado === fechaString;
 
@@ -1440,7 +1463,7 @@ function AppInner() {
               </h3>
               <div style={{ marginTop: '12px', maxHeight: '500px', overflowY: 'auto' }}>
                 {diaSeleccionado ? (() => {
-                  const ventasDelDiaSeleccionado = ventasDelDia.filter(v => (v.fecha || '').slice(0, 10) === diaSeleccionado);
+                  const ventasDelDiaSeleccionado = ventasDelDia.filter(v => fechaLocal(v.fecha) === diaSeleccionado);
                   if (ventasDelDiaSeleccionado.length === 0) {
                     return <div style={{ textAlign: 'center', padding: '20px', color: '#999' }}>No hay ventas este día</div>;
                   }
