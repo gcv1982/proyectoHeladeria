@@ -1132,10 +1132,111 @@ function AppInner() {
     return { montoInicial, totalVentas, retiros: retirosSum, gastos: gastosSum, totalEsperado, totalReal, diferencia };
   };
 
+  const imprimirReporteCierre = (resumen, ventasHoy, retirosHoy) => {
+    const ahora = new Date();
+    const fmt = (d) => `${d.getDate().toString().padStart(2,'0')}/${(d.getMonth()+1).toString().padStart(2,'0')}/${d.getFullYear()} ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;
+
+    // Totales por medio de pago
+    const porMetodo = {};
+    ventasHoy.forEach(v => {
+      (v.pagos || []).forEach(p => {
+        porMetodo[p.metodo] = (porMetodo[p.metodo] || 0) + parseFloat(p.monto || 0);
+      });
+    });
+    const totalGeneral = Object.values(porMetodo).reduce((s, v) => s + v, 0);
+
+    const filaMetodo = (metodo, monto) => `
+      <tr><td>${metodo}</td><td style="text-align:right">$${monto.toLocaleString()}</td></tr>`;
+
+    const filaVenta = (v) => {
+      const hora = new Date(v.fecha);
+      const hh = `${hora.getHours().toString().padStart(2,'0')}:${hora.getMinutes().toString().padStart(2,'0')}`;
+      const items = (v.items || []).map(it => `${it.cantidad}x ${it.nombre}`).join(', ');
+      const pagos = (v.pagos || []).map(p => `${p.metodo} $${parseFloat(p.monto).toLocaleString()}`).join(' / ');
+      return `<tr><td>${hh}</td><td>${items}</td><td>${pagos}</td><td style="text-align:right">$${parseFloat(v.total).toLocaleString()}</td></tr>`;
+    };
+
+    const difColor = resumen.diferencia >= 0 ? '#16a34a' : '#dc2626';
+    const difText = resumen.diferencia >= 0
+      ? `+$${resumen.diferencia.toLocaleString()}`
+      : `-$${Math.abs(resumen.diferencia).toLocaleString()}`;
+
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
+    <title>Reporte de Cierre - ${fmt(ahora)}</title>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body { font-family: Arial, sans-serif; font-size: 13px; color: #111; padding: 20px; max-width: 700px; margin: 0 auto; }
+      h1 { font-size: 18px; text-align: center; margin-bottom: 4px; }
+      .subtitulo { text-align: center; color: #666; font-size: 12px; margin-bottom: 20px; }
+      .seccion { margin-bottom: 18px; }
+      .seccion h2 { font-size: 13px; font-weight: bold; color: #374151; border-bottom: 1px solid #ccc; padding-bottom: 4px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+      table { width: 100%; border-collapse: collapse; }
+      td, th { padding: 5px 6px; }
+      th { background: #f1f5f9; font-weight: bold; font-size: 12px; }
+      tr:nth-child(even) { background: #fafafa; }
+      .resumen-row td { padding: 6px; border-bottom: 1px solid #e5e7eb; }
+      .resumen-row.total td { font-weight: bold; font-size: 14px; border-top: 2px solid #111; }
+      .diferencia { font-size: 15px; font-weight: bold; color: ${difColor}; }
+      .footer { margin-top: 24px; text-align: center; font-size: 11px; color: #999; border-top: 1px solid #eee; padding-top: 10px; }
+      @media print { body { padding: 10px; } button { display: none; } }
+    </style></head><body>
+    <h1>🍦 Grido Laspiur</h1>
+    <p class="subtitulo">Reporte de Cierre de Caja — ${fmt(ahora)}</p>
+    ${inicioCaja ? `<p class="subtitulo">Apertura: ${fmt(new Date(inicioCaja.fecha))}</p>` : ''}
+
+    <div class="seccion">
+      <h2>Resumen de Caja</h2>
+      <table>
+        <tr class="resumen-row"><td>Monto inicial</td><td style="text-align:right">$${resumen.montoInicial.toLocaleString()}</td></tr>
+        ${Object.entries(porMetodo).map(([m, v]) => `<tr class="resumen-row"><td>Ventas ${m}</td><td style="text-align:right">$${v.toLocaleString()}</td></tr>`).join('')}
+        <tr class="resumen-row"><td>Total ventas</td><td style="text-align:right">$${totalGeneral.toLocaleString()}</td></tr>
+        <tr class="resumen-row"><td>Retiros</td><td style="text-align:right">- $${resumen.retiros.toLocaleString()}</td></tr>
+        <tr class="resumen-row"><td>Efectivo esperado en caja</td><td style="text-align:right">$${resumen.totalEsperado.toLocaleString()}</td></tr>
+        <tr class="resumen-row"><td>Efectivo contado</td><td style="text-align:right">$${resumen.totalReal.toLocaleString()}</td></tr>
+        <tr class="resumen-row total"><td>Diferencia</td><td style="text-align:right" class="diferencia">${difText}</td></tr>
+      </table>
+    </div>
+
+    ${retirosHoy.length > 0 ? `
+    <div class="seccion">
+      <h2>Retiros del día</h2>
+      <table>
+        <tr><th>Descripción</th><th style="text-align:right">Monto</th></tr>
+        ${retirosHoy.map(r => `<tr><td>${r.descripcion || '—'}</td><td style="text-align:right">$${parseFloat(r.monto).toLocaleString()}</td></tr>`).join('')}
+      </table>
+    </div>` : ''}
+
+    <div class="seccion">
+      <h2>Ventas del día (${ventasHoy.length})</h2>
+      <table>
+        <tr><th>Hora</th><th>Productos</th><th>Pago</th><th style="text-align:right">Total</th></tr>
+        ${ventasHoy.map(filaVenta).join('')}
+        <tr style="font-weight:bold; border-top:2px solid #111">
+          <td colspan="3">TOTAL</td>
+          <td style="text-align:right">$${totalGeneral.toLocaleString()}</td>
+        </tr>
+      </table>
+    </div>
+
+    <div class="footer">Impreso el ${fmt(ahora)} — Sistema Grido Laspiur</div>
+    <script>window.onload = () => window.print();</script>
+    </body></html>`;
+
+    const ventana = window.open('', '_blank', 'width=750,height=900');
+    ventana.document.write(html);
+    ventana.document.close();
+  };
+
   const confirmarCierreCaja = async () => {
     const resumen = calcularResumenCaja();
     const tokenActual = localStorage.getItem('auth_token');
     const idCaja = cajaId || localStorage.getItem('cajaId');
+
+    // Ventas y retiros de hoy para el reporte
+    const hoy = new Date();
+    const fechaHoy = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`;
+    const ventasHoy = ventasDelDia.filter(v => fechaLocal(v.fecha) === fechaHoy && v.estado !== 'cancelada');
+
     if (idCaja) {
       try {
         const denomCierre = denomCierreRef.current?.getValues() || {};
@@ -1155,7 +1256,10 @@ function AppInner() {
         console.error('Error al cerrar caja en BD:', e);
       }
     }
-    alert(`Cierre de caja\n\nEsperado: $${resumen.totalEsperado.toLocaleString()}\nReal: $${resumen.totalReal.toLocaleString()}\nRetiros: $${resumen.retiros.toLocaleString()}\nGastos: $${resumen.gastos.toLocaleString()}\nDiferencia: $${resumen.diferencia.toLocaleString()}`);
+
+    // Imprimir reporte antes de limpiar los datos
+    imprimirReporteCierre(resumen, ventasHoy, retiros);
+
     setCajaAbierta(false);
     setMostrarCaja(false);
     setCajaId(null);
