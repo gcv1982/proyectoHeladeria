@@ -1595,8 +1595,8 @@ function AppInner() {
           <div style={{ background: '#f8f9fa', border: '1px solid #ddd', borderRadius: '8px', padding: '16px', marginBottom: '24px' }}>
             <h3 style={{ margin: '0 0 12px', fontSize: '14px' }}>Crear nuevo usuario</h3>
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '8px' }}>
-              <input value={nuevoUsuario.nombre} onChange={e => setNuevoUsuario(u => ({ ...u, nombre: e.target.value }))} placeholder="Nombre" style={{ flex: 2, padding: '7px 10px', border: '1px solid #ccc', borderRadius: '6px', fontSize: '13px', minWidth: '130px' }} />
-              <input value={nuevoUsuario.email} onChange={e => setNuevoUsuario(u => ({ ...u, email: e.target.value }))} placeholder="Email" style={{ flex: 2, padding: '7px 10px', border: '1px solid #ccc', borderRadius: '6px', fontSize: '13px', minWidth: '150px' }} />
+              <input value={nuevoUsuario.nombre} onChange={e => setNuevoUsuario(u => ({ ...u, nombre: e.target.value }))} placeholder="Nombre completo" style={{ flex: 2, padding: '7px 10px', border: '1px solid #ccc', borderRadius: '6px', fontSize: '13px', minWidth: '130px' }} />
+              <input value={nuevoUsuario.email} onChange={e => setNuevoUsuario(u => ({ ...u, email: e.target.value }))} placeholder="Nombre de usuario (para login)" style={{ flex: 2, padding: '7px 10px', border: '1px solid #ccc', borderRadius: '6px', fontSize: '13px', minWidth: '150px' }} />
             </div>
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
               <input value={nuevoUsuario.password} onChange={e => setNuevoUsuario(u => ({ ...u, password: e.target.value }))} placeholder="Contraseña" style={{ flex: 2, padding: '7px 10px', border: '1px solid #ccc', borderRadius: '6px', fontSize: '13px', minWidth: '130px' }} />
@@ -1614,7 +1614,7 @@ function AppInner() {
             <thead>
               <tr style={{ background: '#f1f5f9', borderBottom: '2px solid #e2e8f0' }}>
                 <th style={{ padding: '10px 8px', textAlign: 'left', color: '#374151' }}>Nombre</th>
-                <th style={{ padding: '10px 8px', textAlign: 'left', color: '#374151' }}>Email</th>
+                <th style={{ padding: '10px 8px', textAlign: 'left', color: '#374151' }}>Usuario (login)</th>
                 <th style={{ padding: '10px 8px', textAlign: 'left', color: '#374151' }}>Rol</th>
                 <th style={{ padding: '10px 8px', textAlign: 'left', color: '#374151' }}>Contraseña</th>
                 <th style={{ padding: '10px 8px', textAlign: 'center', color: '#374151' }}>Acciones</th>
