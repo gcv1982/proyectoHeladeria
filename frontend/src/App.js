@@ -1420,16 +1420,8 @@ function AppInner() {
                 <>
                   <div className="usuario-info">{user.nombre}</div>
                   <button className="btn-logout" onClick={() => {
-                    if (cajaAbierta) {
-                      alert('⚠️ Debes cerrar la caja antes de cerrar sesión.');
-                      setMostrarDashboard(false);
-                      setMostrarCaja(true);
-                      setMostrarRetiros(false);
-                      setCategoriaActiva(null);
-                      return;
-                    }
-                    // Solo limpiar estado local de sesión, NO el estado de la caja
-                    // (la caja puede seguir abierta para el próximo usuario)
+                    // La caja es del local, no del usuario.
+                    // Se puede cambiar de sesión sin cerrar la caja.
                     localStorage.removeItem('retiros');
                     localStorage.removeItem('gastos');
                     cerrarTurno();
