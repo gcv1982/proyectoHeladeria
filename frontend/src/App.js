@@ -220,6 +220,44 @@ function AppInner() {
     } catch (e) { console.error('Error al cerrar turno:', e); }
   };
 
+  const cargarCajaDesdeDB = async () => {
+    const tokenActual = localStorage.getItem('auth_token');
+    if (!tokenActual) return;
+    try {
+      const res = await fetch(`${API_URL}/cajas/abierta`, {
+        headers: { 'Authorization': `Bearer ${tokenActual}` }
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.caja) {
+        const caja = data.caja;
+        setCajaId(caja.id);
+        setCajaAbierta(true);
+        const denoms = caja.denominaciones_inicio || {};
+        const montoInicial = parseFloat(caja.monto_inicial) || 0;
+        const datosCaja = {
+          fecha: caja.fecha_apertura,
+          montoInicial,
+          denominaciones: denoms
+        };
+        setInicioCaja(datosCaja);
+        localStorage.setItem('cajaAbierta', 'true');
+        localStorage.setItem('cajaId', String(caja.id));
+        localStorage.setItem('inicioCaja', JSON.stringify(datosCaja));
+      } else {
+        // No hay caja abierta en DB, limpiar estado local
+        setCajaAbierta(false);
+        setCajaId(null);
+        setInicioCaja(null);
+        localStorage.removeItem('cajaAbierta');
+        localStorage.removeItem('cajaId');
+        localStorage.removeItem('inicioCaja');
+      }
+    } catch (e) {
+      console.error('Error al cargar caja desde DB:', e);
+    }
+  };
+
   const cargarTurnoActivo = async () => {
     const tokenActual = localStorage.getItem('auth_token');
     if (!tokenActual || !user) return;
@@ -550,6 +588,7 @@ function AppInner() {
       apiCargarVentasDelDia(hoy.getMonth(), hoy.getFullYear());
       cargarRetiros();
       cargarProductos();
+      cargarCajaDesdeDB();
       abrirTurno();
     }
   }, [user, token]);
@@ -1389,10 +1428,8 @@ function AppInner() {
                       setCategoriaActiva(null);
                       return;
                     }
-                    setCajaAbierta(false);
-                    setInicioCaja(null);
-                    localStorage.removeItem('cajaAbierta');
-                    localStorage.removeItem('inicioCaja');
+                    // Solo limpiar estado local de sesión, NO el estado de la caja
+                    // (la caja puede seguir abierta para el próximo usuario)
                     localStorage.removeItem('retiros');
                     localStorage.removeItem('gastos');
                     cerrarTurno();
