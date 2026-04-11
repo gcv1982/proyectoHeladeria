@@ -2,7 +2,11 @@
 const jwt = require('jsonwebtoken');
 require('dotenv').config();
 
-const claveSecreta = process.env.JWT_SECRET || 'clave_super_secreta_heladeria';
+const claveSecreta = process.env.JWT_SECRET;
+if (!claveSecreta) {
+  console.error('❌ JWT_SECRET no definido en .env');
+  process.exit(1);
+}
 
 exports.verificarToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];

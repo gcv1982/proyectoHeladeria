@@ -5,7 +5,11 @@ const bcrypt = require('bcrypt');
 const db = require('../db');
 require('dotenv').config();
 
-const claveSecreta = process.env.JWT_SECRET || 'clave_super_secreta_heladeria';
+const claveSecreta = process.env.JWT_SECRET;
+if (!claveSecreta) {
+  console.error('❌ JWT_SECRET no definido en .env — el servidor no puede iniciar de forma segura');
+  process.exit(1);
+}
 
 exports.login = async (req, res) => {
   const { email, password } = req.body;
@@ -28,7 +32,7 @@ exports.login = async (req, res) => {
         rol: usuario.rol
       },
       claveSecreta,
-      { expiresIn: '30d' }
+      { expiresIn: '7d' }
     );
 
     res.json({ token });
