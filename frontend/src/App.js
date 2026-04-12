@@ -4,7 +4,7 @@ import './App.css';
 import { useAuth } from './AuthContext';
 import Login from './Login';
 
-const API_URL = 'http://localhost:5000/api';
+const API_URL = '/api';
 
 // ─── Componente de grilla de denominaciones ──────────────────────────────────
 // Se define FUERA de AppInner para que tenga su propio ciclo de render.
@@ -117,9 +117,17 @@ function AppInner() {
   const [ventaEditando, setVentaEditando] = useState(null);
   const [productoAgregarEdit, setProductoAgregarEdit] = useState('');
   const [mostrarCaja, setMostrarCaja] = useState(false);
-  const [cajaAbierta, setCajaAbierta] = useState(false);
-  const [inicioCaja, setInicioCaja] = useState(null);
-  const [cajaId, setCajaId] = useState(null);
+  const [cajaAbierta, setCajaAbierta] = useState(() => localStorage.getItem('cajaAbierta') === 'true');
+  const [inicioCaja, setInicioCaja] = useState(() => {
+    try {
+      const saved = localStorage.getItem('inicioCaja');
+      return saved ? JSON.parse(saved) : null;
+    } catch { return null; }
+  });
+  const [cajaId, setCajaId] = useState(() => {
+    const saved = localStorage.getItem('cajaId');
+    return saved ? parseInt(saved) : null;
+  });
   const [ventasDelDia, setVentasDelDia] = useState([]);
   // Refs a los componentes DenomGrid (manejan su propio estado)
   const denomInicioRef = useRef();
@@ -624,7 +632,8 @@ function AppInner() {
     const monto = parseFloat(nuevoRetiroMonto);
     if (!monto || monto <= 0) { alert('Ingrese un monto válido para el retiro'); return; }
     const hoyStr = (() => { const h = new Date(); return `${h.getFullYear()}-${String(h.getMonth()+1).padStart(2,'0')}-${String(h.getDate()).padStart(2,'0')}`; })();
-    const montoDisponible = (inicioCaja ? inicioCaja.montoInicial : 0) + ventasDelDia.filter(v => fechaLocal(v.fecha) === hoyStr).reduce((s, v) => {
+    const fechaDesdeApertura = inicioCaja?.fecha ? fechaLocal(inicioCaja.fecha) : hoyStr;
+    const montoDisponible = (inicioCaja ? inicioCaja.montoInicial : 0) + ventasDelDia.filter(v => fechaLocal(v.fecha) >= fechaDesdeApertura).reduce((s, v) => {
       const efectivo = (v.pagos || []).reduce((ps, p) => p.metodo === 'EFECTIVO' ? ps + (parseFloat(p.monto) || 0) : ps, 0);
       return s + efectivo;
     }, 0) - sumarRetiros();
@@ -1235,7 +1244,8 @@ function AppInner() {
     const montoInicial = inicioCaja ? inicioCaja.montoInicial : 0;
     const hoy = new Date();
     const fechaHoy = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`;
-    const ventasHoy = ventasDelDia.filter(v => fechaLocal(v.fecha) === fechaHoy);
+    const fechaDesdeApertura = inicioCaja?.fecha ? fechaLocal(inicioCaja.fecha) : fechaHoy;
+    const ventasHoy = ventasDelDia.filter(v => fechaLocal(v.fecha) >= fechaDesdeApertura);
     // Sumar SOLO el efectivo de hoy, no transferencias ni débitos
     const totalVentas = ventasHoy.reduce((sum, v) => {
       const efectivoDelVenta = v.pagos?.reduce((pSum, p) => {
@@ -1265,84 +1275,66 @@ function AppInner() {
     });
     const totalGeneral = Object.values(porMetodo).reduce((s, v) => s + v, 0);
 
-    const filaMetodo = (metodo, monto) => `
-      <tr><td>${metodo}</td><td style="text-align:right">$${monto.toLocaleString()}</td></tr>`;
-
-    const filaVenta = (v) => {
-      const hora = new Date(v.fecha);
-      const hh = `${hora.getHours().toString().padStart(2,'0')}:${hora.getMinutes().toString().padStart(2,'0')}`;
-      const items = (v.items || []).map(it => `${it.cantidad}x ${it.nombre}`).join(', ');
-      const pagos = (v.pagos || []).map(p => `${p.metodo} $${parseFloat(p.monto).toLocaleString()}`).join(' / ');
-      return `<tr><td>${hh}</td><td>${items}</td><td>${pagos}</td><td style="text-align:right">$${parseFloat(v.total).toLocaleString()}</td></tr>`;
-    };
-
     const difColor = resumen.diferencia >= 0 ? '#16a34a' : '#dc2626';
     const difText = resumen.diferencia >= 0
       ? `+$${resumen.diferencia.toLocaleString()}`
       : `-$${Math.abs(resumen.diferencia).toLocaleString()}`;
 
+    const fila = (label, valor, bold = false, color = '') =>
+      `<tr style="${bold ? 'font-weight:bold;border-top:1px solid #111;' : ''}">
+        <td style="padding:5px 4px;">${label}</td>
+        <td style="text-align:right;padding:5px 4px;${color ? `color:${color};font-weight:bold;` : ''}">$${valor}</td>
+      </tr>`;
+
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
-    <title>Reporte de Cierre - ${fmt(ahora)}</title>
+    <title>Cierre de Caja</title>
     <style>
       * { margin: 0; padding: 0; box-sizing: border-box; }
-      body { font-family: Arial, sans-serif; font-size: 13px; color: #111; padding: 20px; max-width: 700px; margin: 0 auto; }
-      h1 { font-size: 18px; text-align: center; margin-bottom: 4px; }
-      .subtitulo { text-align: center; color: #666; font-size: 12px; margin-bottom: 20px; }
-      .seccion { margin-bottom: 18px; }
-      .seccion h2 { font-size: 13px; font-weight: bold; color: #374151; border-bottom: 1px solid #ccc; padding-bottom: 4px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+      body { font-family: 'Courier New', monospace; font-size: 13px; color: #111; padding: 16px; max-width: 320px; margin: 0 auto; }
+      h1 { font-size: 16px; text-align: center; margin-bottom: 2px; }
+      .sub { text-align: center; font-size: 11px; color: #555; margin-bottom: 12px; }
+      .linea { border-top: 1px dashed #999; margin: 10px 0; }
       table { width: 100%; border-collapse: collapse; }
-      td, th { padding: 5px 6px; }
-      th { background: #f1f5f9; font-weight: bold; font-size: 12px; }
-      tr:nth-child(even) { background: #fafafa; }
-      .resumen-row td { padding: 6px; border-bottom: 1px solid #e5e7eb; }
-      .resumen-row.total td { font-weight: bold; font-size: 14px; border-top: 2px solid #111; }
-      .diferencia { font-size: 15px; font-weight: bold; color: ${difColor}; }
-      .footer { margin-top: 24px; text-align: center; font-size: 11px; color: #999; border-top: 1px solid #eee; padding-top: 10px; }
-      @media print { body { padding: 10px; } button { display: none; } }
+      td { font-size: 13px; }
+      .titulo-sec { font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; color: #555; margin: 10px 0 4px 0; }
+      @media print { body { padding: 4px; } }
     </style></head><body>
-    <h1>🍦 Grido Laspiur</h1>
-    <p class="subtitulo">Reporte de Cierre de Caja — ${fmt(ahora)}</p>
-    ${inicioCaja ? `<p class="subtitulo">Apertura: ${fmt(new Date(inicioCaja.fecha))}</p>` : ''}
+    <h1>GRIDO LASPIUR</h1>
+    <p class="sub">CIERRE DE CAJA</p>
+    <p class="sub">${fmt(ahora)}</p>
+    ${inicioCaja ? `<p class="sub">Apertura: ${fmt(new Date(inicioCaja.fecha))}</p>` : ''}
 
-    <div class="seccion">
-      <h2>Resumen de Caja</h2>
-      <table>
-        <tr class="resumen-row"><td>Monto inicial</td><td style="text-align:right">$${resumen.montoInicial.toLocaleString()}</td></tr>
-        ${Object.entries(porMetodo).map(([m, v]) => `<tr class="resumen-row"><td>Ventas ${m}</td><td style="text-align:right">$${v.toLocaleString()}</td></tr>`).join('')}
-        <tr class="resumen-row"><td>Total ventas</td><td style="text-align:right">$${totalGeneral.toLocaleString()}</td></tr>
-        <tr class="resumen-row"><td>Retiros</td><td style="text-align:right">- $${resumen.retiros.toLocaleString()}</td></tr>
-        <tr class="resumen-row"><td>Efectivo esperado en caja</td><td style="text-align:right">$${resumen.totalEsperado.toLocaleString()}</td></tr>
-        <tr class="resumen-row"><td>Efectivo contado</td><td style="text-align:right">$${resumen.totalReal.toLocaleString()}</td></tr>
-        <tr class="resumen-row total"><td>Diferencia</td><td style="text-align:right" class="diferencia">${difText}</td></tr>
-      </table>
-    </div>
+    <div class="linea"></div>
+    <p class="titulo-sec">Ventas por medio de pago</p>
+    <table>
+      ${Object.entries(porMetodo).map(([m, v]) => fila(m, v.toLocaleString())).join('')}
+      ${fila('TOTAL VENTAS', totalGeneral.toLocaleString(), true)}
+    </table>
+
+    <div class="linea"></div>
+    <p class="titulo-sec">Caja efectivo</p>
+    <table>
+      ${fila('Monto inicial', resumen.montoInicial.toLocaleString())}
+      ${fila('Ventas efectivo', (porMetodo['EFECTIVO'] || 0).toLocaleString())}
+      ${resumen.retiros > 0 ? fila('Retiros', resumen.retiros.toLocaleString()) : ''}
+      ${fila('Efectivo esperado', resumen.totalEsperado.toLocaleString(), true)}
+      ${fila('Efectivo contado', resumen.totalReal.toLocaleString())}
+      ${fila('Diferencia', difText.replace('$',''), true, difColor)}
+    </table>
 
     ${retirosHoy.length > 0 ? `
-    <div class="seccion">
-      <h2>Retiros del día</h2>
-      <table>
-        <tr><th>Descripción</th><th style="text-align:right">Monto</th></tr>
-        ${retirosHoy.map(r => `<tr><td>${r.descripcion || '—'}</td><td style="text-align:right">$${parseFloat(r.monto).toLocaleString()}</td></tr>`).join('')}
-      </table>
-    </div>` : ''}
+    <div class="linea"></div>
+    <p class="titulo-sec">Retiros (${retirosHoy.length})</p>
+    <table>
+      ${retirosHoy.map(r => fila(r.descripcion || 'Retiro', parseFloat(r.monto).toLocaleString())).join('')}
+    </table>` : ''}
 
-    <div class="seccion">
-      <h2>Ventas del día (${ventasHoy.length})</h2>
-      <table>
-        <tr><th>Hora</th><th>Productos</th><th>Pago</th><th style="text-align:right">Total</th></tr>
-        ${ventasHoy.map(filaVenta).join('')}
-        <tr style="font-weight:bold; border-top:2px solid #111">
-          <td colspan="3">TOTAL</td>
-          <td style="text-align:right">$${totalGeneral.toLocaleString()}</td>
-        </tr>
-      </table>
-    </div>
-
-    <div class="footer">Impreso el ${fmt(ahora)} — Sistema Grido Laspiur</div>
+    <div class="linea"></div>
+    <p class="sub">Sistema Grido Laspiur</p>
     <script>window.onload = () => window.print();</script>
     </body></html>`;
 
-    const ventana = window.open('', '_blank', 'width=750,height=900');
+    const ventana = window.open('', '_blank', 'width=380,height=600');
     ventana.document.write(html);
     ventana.document.close();
   };
@@ -1352,10 +1344,11 @@ function AppInner() {
     const tokenActual = localStorage.getItem('auth_token');
     const idCaja = cajaId || localStorage.getItem('cajaId');
 
-    // Ventas y retiros de hoy para el reporte
+    // Ventas desde la apertura de caja para el reporte
     const hoy = new Date();
     const fechaHoy = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`;
-    const ventasHoy = ventasDelDia.filter(v => fechaLocal(v.fecha) === fechaHoy && v.estado !== 'cancelada');
+    const fechaDesdeApertura = inicioCaja?.fecha ? fechaLocal(inicioCaja.fecha) : fechaHoy;
+    const ventasHoy = ventasDelDia.filter(v => fechaLocal(v.fecha) >= fechaDesdeApertura && v.estado !== 'cancelada');
 
     if (idCaja) {
       try {
@@ -1400,7 +1393,10 @@ function AppInner() {
   return (
     <div className="App">
       <div style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center', maxWidth: '1400px', margin: '0 auto 30px', gap: '12px' }}>
-        <h1 style={{ margin: 0, marginRight: '8px', fontSize: '14px', fontWeight: 600 }}>🍦 Grido Laspiur</h1>
+        <h1 style={{ margin: 0, marginRight: '8px', fontSize: '22px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
+  <img src="/favicon-32x32.png" alt="" style={{ width: '36px', height: '36px', borderRadius: '50%', border: '2px solid white', overflow: 'hidden' }} />
+  Grido Laspiur
+</h1>
           <div className="header-actions" style={{ display: 'flex', gap: 0, alignItems: 'center', marginLeft: 'auto' }}>
             <nav className="main-nav" style={{ display: 'flex', gap: '6px' }}>
               <button className={`nav-btn ${mostrarDashboard ? 'active' : ''}`} onClick={() => { setMostrarDashboard(true); setMostrarCaja(false); setMostrarRetiros(false); setMostrarGestionProductos(false); setMostrarGestionUsuarios(false); setMostrarHistorialCajas(false); setMostrarMiTurno(false); setMostrarHistorialTurnos(false); }}>Dashboard</button>
@@ -1462,7 +1458,8 @@ function AppInner() {
                   {(() => {
   const hoy = new Date();
   const fechaHoy = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`;
-  const ventasHoy = ventasDelDia.filter(v => fechaLocal(v.fecha) === fechaHoy);
+  const fechaDesdeApertura = inicioCaja?.fecha ? fechaLocal(inicioCaja.fecha) : fechaHoy;
+  const ventasHoy = ventasDelDia.filter(v => fechaLocal(v.fecha) >= fechaDesdeApertura);
   const medios = calcularMetricasMedios(ventasHoy);
   return medios.lista.length > 0 ? (
     <div className="resumen-medios">
@@ -2020,6 +2017,39 @@ function AppInner() {
             <div className="dashboard-card morado"><div className="card-icono">📈</div><div className="card-numero">${calcularMetricas().ventaPromedio.toLocaleString('es-AR', { maximumFractionDigits: 0 })}</div><div className="card-titulo">Venta Promedio</div></div>
           </div>
 
+          {(() => {
+            const medios = calcularMetricasMedios(filtrarVentasPorPeriodo());
+            if (medios.lista.length === 0) return null;
+            return (
+              <div className="top-productos" style={{ marginTop: '16px' }}>
+                <h3 style={{ color: '#000', marginBottom: '12px' }}>Medios de Pago — {periodoSeleccionado}</h3>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                  <thead>
+                    <tr style={{ backgroundColor: '#f0f0f0', borderBottom: '2px solid #ddd' }}>
+                      <th style={{ padding: '8px', textAlign: 'left', color: '#000' }}>Medio</th>
+                      <th style={{ padding: '8px', textAlign: 'right', color: '#000' }}>Total</th>
+                      <th style={{ padding: '8px', textAlign: 'right', color: '#000' }}>%</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {medios.lista.map((m, idx) => (
+                      <tr key={idx} style={{ borderBottom: '1px solid #eee' }}>
+                        <td style={{ padding: '8px', color: '#000', fontWeight: 'bold' }}>{m.metodo}</td>
+                        <td style={{ padding: '8px', textAlign: 'right', color: '#000' }}>${m.monto.toLocaleString()}</td>
+                        <td style={{ padding: '8px', textAlign: 'right', color: '#000' }}>{m.porcentaje}%</td>
+                      </tr>
+                    ))}
+                    <tr style={{ borderTop: '2px solid #111', fontWeight: 'bold', backgroundColor: '#f0f0f0' }}>
+                      <td style={{ padding: '8px', color: '#000' }}>TOTAL</td>
+                      <td style={{ padding: '8px', textAlign: 'right', color: '#000' }}>${medios.total.toLocaleString()}</td>
+                      <td style={{ padding: '8px', textAlign: 'right', color: '#000' }}>100%</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            );
+          })()}
+
           {detalleDashboard === 'ventas' && (() => {
             const ventas = filtrarVentasPorPeriodo();
             return (
@@ -2031,7 +2061,7 @@ function AppInner() {
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
                     <thead>
                       <tr style={{ backgroundColor: '#f0f0f0', borderBottom: '2px solid #ddd' }}>
-                        <th style={{ padding: '8px', textAlign: 'left', color: '#000' }}>Hora</th>
+                        <th style={{ padding: '8px', textAlign: 'left', color: '#000' }}>{periodoSeleccionado === 'HOY' ? 'Hora' : 'Fecha y hora'}</th>
                         <th style={{ padding: '8px', textAlign: 'left', color: '#000' }}>Productos</th>
                         <th style={{ padding: '8px', textAlign: 'left', color: '#000' }}>Medio de pago</th>
                         <th style={{ padding: '8px', textAlign: 'right', color: '#000' }}>Total</th>
@@ -2042,6 +2072,7 @@ function AppInner() {
                       {ventas.map((v, idx) => (
                         <tr key={idx} style={{ borderBottom: '1px solid #eee' }}>
                           <td style={{ padding: '8px', color: '#000', whiteSpace: 'nowrap' }}>
+                            {periodoSeleccionado !== 'HOY' && `${new Date(v.fecha).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' })} `}
                             {new Date(v.fecha).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}
                           </td>
                           <td style={{ padding: '8px', color: '#000' }}>
@@ -2475,9 +2506,10 @@ function AppInner() {
 
             {pagosSeleccionados.length < 2 && (
               <div className="modal-botones">
-                <button className="metodo-pago-btn efectivo" onClick={() => agregarMetodoPago('EFECTIVO')}>💵 EFECTIVO</button>
-                <button className="metodo-pago-btn debito" onClick={() => agregarMetodoPago('DÉBITO')}>💳 DÉBITO</button>
-                <button className="metodo-pago-btn transferencia" onClick={() => agregarMetodoPago('TRANSFERENCIA')}>📱 TRANSFERENCIA</button>
+                <button className="metodo-pago-btn efectivo" onClick={() => agregarMetodoPago('EFECTIVO')}>EFECTIVO</button>
+                <button className="metodo-pago-btn debito" onClick={() => agregarMetodoPago('DÉBITO')}>DÉBITO</button>
+                <button className="metodo-pago-btn transferencia" onClick={() => agregarMetodoPago('TRANSFERENCIA')}>TRANSFERENCIA</button>
+                <button className="metodo-pago-btn qr" onClick={() => agregarMetodoPago('QR')}>QR</button>
               </div>
             )}
 

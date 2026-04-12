@@ -3,6 +3,7 @@ require('dotenv').config();
 
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
 const initDB = require('./initDB');
 
 const app = express();
@@ -12,7 +13,7 @@ const db = require('./db');
 // Probar conexión a BD
 (async () => {
   try {
-    const result = await db.query('SELECT 1');
+    await db.query('SELECT 1');
     console.log('✅ Conexión a la base de datos exitosa');
   } catch (err) {
     console.error('❌ Error de conexión:', err.message);
@@ -22,24 +23,16 @@ const db = require('./db');
 // Inicializar tablas de BD
 initDB().catch(err => console.error('Error en inicialización de BD:', err));
 
-// Configurar CORS para React (localhost:3000, 3001) y otros orígenes
-const allowedOrigins = ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3002', 'http://127.0.0.1:3000', 'http://127.0.0.1:3001', 'http://127.0.0.1:3002', 'http://localhost:5500', 'http://127.0.0.1:5500'];
-
-// Configurar CORS usando el paquete cors
-app.use(cors({
-  origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('CORS no permitido'));
-    }
-  },
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true,
-  preflightContinue: false,
-  optionsSuccessStatus: 200
-}));
+// CORS solo para desarrollo (React en puerto 3000)
+if (process.env.NODE_ENV !== 'production') {
+  app.use(cors({
+    origin: ['http://localhost:3000', 'http://localhost:3001'],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true,
+    optionsSuccessStatus: 200
+  }));
+}
 
 app.use(express.json());
 app.use('/api', rutas);
@@ -49,6 +42,16 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', message: 'Servidor funcionando correctamente' });
 });
 
-app.listen(5000, () => {
-  console.log('🚀 Servidor corriendo en http://localhost:5000');
+// Servir el build de React en producción
+const buildPath = path.join(__dirname, '../frontend/build');
+app.use(express.static(buildPath));
+
+// Cualquier ruta que no sea /api devuelve el index.html de React
+app.use((req, res) => {
+  res.sendFile(path.join(buildPath, 'index.html'));
+});
+
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`🚀 Servidor corriendo en http://0.0.0.0:${PORT}`);
 });

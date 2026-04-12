@@ -1541,6 +1541,10 @@
   background: linear-gradient(135deg, #fd7e14 0%, #e8590c 100%);
 }
 
+.metodo-pago-btn.qr {
+  background: linear-gradient(135deg, #6f42c1 0%, #5a2d9e 100%);
+}
+
 .modal-cancelar {
   width: 100%;
   padding: 9px;
