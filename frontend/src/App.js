@@ -17,7 +17,7 @@ import VentaConfirmada from './components/VentaConfirmada';
 import ModalEditarVenta from './components/ModalEditarVenta';
 import POSView from './components/POSView';
 
-import { fechaLocal, calcularResumenCaja } from './utils/reportes';
+import { fechaLocal, calcularResumenCaja, calcularMetricasMedios } from './utils/reportes';
 import { printTicket, imprimirReporteCierre } from './utils/impresion';
 
 const API_URL = '/api';
@@ -267,6 +267,22 @@ function AppInner() {
     }
 
     imprimirReporteCierre(resumen, ventasHoy, retiros, inicioCaja);
+
+    // Enviar resumen por email al admin
+    try {
+      const medios = calcularMetricasMedios(ventasHoy);
+      await fetch(`${API_URL}/email/resumen-cierre`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${tokenActual}` },
+        body: JSON.stringify({
+          fecha: new Date().toISOString(),
+          resumen,
+          ventasPorMedio: medios.lista,
+          retiros,
+          gastos,
+        }),
+      });
+    } catch (e) { console.error('Error al enviar email de cierre:', e); }
 
     setCajaAbierta(false); setMostrarCaja(false); setCajaId(null);
     setCierreKey(k => k + 1); setCierreTotalContado(0);

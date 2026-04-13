@@ -83,4 +83,19 @@ router.put('/cajas/:id/cerrar', verificarToken, verificarRol(['admin']), cerrarC
 router.get('/cajas/abierta', verificarToken, obtenerCajaAbierta);
 router.get('/cajas/historial', verificarToken, verificarRol(['admin']), obtenerHistorialCajas);
 
+// ========== EMAIL ==========
+const { enviarResumenCierre } = require('./services/emailService');
+
+
+router.post('/email/resumen-cierre', verificarToken, verificarRol(['admin']), async (req, res) => {
+  try {
+    const { fecha, resumen, ventasPorMedio, retiros, gastos } = req.body;
+    await enviarResumenCierre({ fecha, resumen, ventasPorMedio, retiros, gastos });
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error al enviar email:', error);
+    res.status(500).json({ error: 'No se pudo enviar el email', details: error.message });
+  }
+});
+
 module.exports = router;
