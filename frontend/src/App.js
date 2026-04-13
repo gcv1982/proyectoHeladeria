@@ -1,205 +1,291 @@
 
-import React, { useState, useEffect, useRef, useImperativeHandle } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import './App.css';
 import { useAuth } from './AuthContext';
 import Login from './Login';
 
+import CajaView from './components/CajaView';
+import RetirosView from './components/RetirosView';
+import GestionProductos from './components/GestionProductos';
+import GestionUsuarios from './components/GestionUsuarios';
+import HistorialCajas from './components/HistorialCajas';
+import HistorialTurnos from './components/HistorialTurnos';
+import MiTurno from './components/MiTurno';
+import Dashboard from './components/Dashboard';
+import ModalPago from './components/ModalPago';
+import VentaConfirmada from './components/VentaConfirmada';
+import ModalEditarVenta from './components/ModalEditarVenta';
+import POSView from './components/POSView';
+
+import { fechaLocal, calcularResumenCaja } from './utils/reportes';
+import { printTicket, imprimirReporteCierre } from './utils/impresion';
+
 const API_URL = '/api';
-
-// ─── Componente de grilla de denominaciones ──────────────────────────────────
-// Se define FUERA de AppInner para que tenga su propio ciclo de render.
-// Así cada tecla sólo re-renderiza este componente pequeño, no todo AppInner.
-const DENOM_CONFIG = [
-  { key: 'd20000', label: '💵 $20.000', mult: 20000 },
-  { key: 'd10000', label: '💵 $10.000', mult: 10000 },
-  { key: 'd2000',  label: '💵 $2.000',  mult: 2000  },
-  { key: 'd1000',  label: '💵 $1.000',  mult: 1000  },
-  { key: 'd500',   label: '💵 $500',    mult: 500   },
-  { key: 'd200',   label: '💵 $200',    mult: 200   },
-  { key: 'd100',   label: '💵 $100',    mult: 100   },
-  { key: 'd50',    label: '🪙 $50',     mult: 50    },
-  { key: 'd20',    label: '🪙 $20',     mult: 20    },
-  { key: 'd10',    label: '🪙 $10',     mult: 10    },
-];
-const DENOM_INIT = { d20000:'', d10000:'', d2000:'', d1000:'', d500:'', d200:'', d100:'', d50:'', d20:'', d10:'' };
-const calcDenomTotal = (v) => DENOM_CONFIG.reduce((s, { key, mult }) => s + (Number(v[key])||0)*mult, 0);
-
-function DenomGrid({ prefix, gridClass, totalLabel, onTotalChange, storageKey, ref }) {
-  const [vals, setVals] = useState(() => {
-    if (storageKey) {
-      try {
-        const saved = localStorage.getItem(storageKey);
-        if (saved) return { ...DENOM_INIT, ...JSON.parse(saved) };
-      } catch (e) { /* ignorar */ }
-    }
-    return DENOM_INIT;
-  });
-  const total = calcDenomTotal(vals);
-
-  useImperativeHandle(ref, () => ({
-    getTotal:  () => calcDenomTotal(vals),
-    getValues: () => ({ ...vals }),
-  }), [vals]);
-
-  // Notificar al padre el total inicial (al montar, por si viene de localStorage)
-  useEffect(() => { if (onTotalChange) onTotalChange(total); }, []); // eslint-disable-line
-
-  const handleChange = (key) => (e) => {
-    const raw = e.target.value;
-    const v = raw === '' ? '' : String(Math.max(0, parseInt(raw, 10) || 0));
-    const newVals = { ...vals, [key]: v };
-    if (storageKey) {
-      try { localStorage.setItem(storageKey, JSON.stringify(newVals)); } catch (_) {}
-    }
-    setVals(newVals);
-    if (onTotalChange) onTotalChange(calcDenomTotal(newVals));
-  };
-
-  return (
-    <>
-      <div className={gridClass}>
-        {DENOM_CONFIG.map(({ key, label, mult }) => (
-          <div key={key} className="denominacion-item">
-            <label htmlFor={`${prefix}-${key}`}>{label}</label>
-            <input
-              id={`${prefix}-${key}`}
-              name={`${prefix}-${key}`}
-              type="text"
-              inputMode="numeric"
-              pattern="[0-9]*"
-              value={vals[key]}
-              onChange={handleChange(key)}
-              placeholder="0"
-            />
-            <span className="subtotal">${((Number(vals[key])||0)*mult).toLocaleString()}</span>
-          </div>
-        ))}
-      </div>
-      <div className="total-inicio" style={gridClass === 'denominaciones-grid-cierre' ? {marginTop:'8px', padding:'6px 12px'} : {}}>
-        <h3>{totalLabel}:</h3><h2>${total.toLocaleString()}</h2>
-      </div>
-    </>
-  );
-}
-// ─────────────────────────────────────────────────────────────────────────────
 
 function AppInner() {
   const { user, token, role, logout } = useAuth();
 
+  // ── Estado de productos ────────────────────────────────────────────────────
   const [productos, setProductos] = useState([]);
-  const [mostrarGestionProductos, setMostrarGestionProductos] = useState(false);
-  const [productoEditando, setProductoEditando] = useState(null);
+  const [todosProductos, setTodosProductos] = useState([]);
   const [nuevoProducto, setNuevoProducto] = useState({ nombre: '', precio_unitario: '', categoria: 'GRANEL' });
-  const [mostrarGestionUsuarios, setMostrarGestionUsuarios] = useState(false);
+  const [productoEditando, setProductoEditando] = useState(null);
+
+  // ── Estado de usuarios ─────────────────────────────────────────────────────
   const [usuarios, setUsuarios] = useState([]);
   const [nuevoUsuario, setNuevoUsuario] = useState({ nombre: '', email: '', password: '', rol: 'vendedor' });
   const [usuarioEditando, setUsuarioEditando] = useState(null);
   const [nuevaPasswordEdit, setNuevaPasswordEdit] = useState('');
-  const [mostrarHistorialCajas, setMostrarHistorialCajas] = useState(false);
+
+  // ── Estado de historial de cajas / turnos ──────────────────────────────────
   const [historialCajas, setHistorialCajas] = useState([]);
   const [turnoActivo, setTurnoActivo] = useState(null);
-  const [mostrarMiTurno, setMostrarMiTurno] = useState(false);
-  const [mostrarHistorialTurnos, setMostrarHistorialTurnos] = useState(false);
   const [historialTurnos, setHistorialTurnos] = useState([]);
-  const [turnoDetalle, setTurnoDetalle] = useState(null); // ventas del turno seleccionado
+  const [turnoDetalle, setTurnoDetalle] = useState(null);
 
   const categorias = ['GRANEL', 'POSTRES', 'CUCURUCHOS', 'PALITOS', 'TORTAS', 'FAMILIARES', 'TENTACIONES', 'BATIDOS', 'BEBIDAS', 'PROMOCIONES', 'EXTRAS', 'PIZZAS', 'SIN TACC', 'CHOCOLATES'];
 
+  // ── Estado del POS ─────────────────────────────────────────────────────────
   const [carrito, setCarrito] = useState([]);
   const [seleccionado, setSeleccionado] = useState(null);
   const [categoriaActiva, setCategoriaActiva] = useState(null);
+
+  // ── Estado de navegación ───────────────────────────────────────────────────
   const [mostrarDashboard, setMostrarDashboard] = useState(false);
   const [mostrarRetiros, setMostrarRetiros] = useState(false);
-  const [periodoSeleccionado, setPeriodoSeleccionado] = useState('HOY');
+  const [mostrarCaja, setMostrarCaja] = useState(false);
+  const [mostrarGestionProductos, setMostrarGestionProductos] = useState(false);
+  const [mostrarGestionUsuarios, setMostrarGestionUsuarios] = useState(false);
+  const [mostrarHistorialCajas, setMostrarHistorialCajas] = useState(false);
+  const [mostrarMiTurno, setMostrarMiTurno] = useState(false);
+  const [mostrarHistorialTurnos, setMostrarHistorialTurnos] = useState(false);
+
+  // ── Estado del pago / venta ────────────────────────────────────────────────
   const [mostrarModalPago, setMostrarModalPago] = useState(false);
   const [pagosSeleccionados, setPagosSeleccionados] = useState([]);
   const [ventaConfirmada, setVentaConfirmada] = useState(null);
   const [ventaEditando, setVentaEditando] = useState(null);
   const [productoAgregarEdit, setProductoAgregarEdit] = useState('');
-  const [mostrarCaja, setMostrarCaja] = useState(false);
+
+  // ── Estado de caja ─────────────────────────────────────────────────────────
   const [cajaAbierta, setCajaAbierta] = useState(() => localStorage.getItem('cajaAbierta') === 'true');
   const [inicioCaja, setInicioCaja] = useState(() => {
-    try {
-      const saved = localStorage.getItem('inicioCaja');
-      return saved ? JSON.parse(saved) : null;
-    } catch { return null; }
+    try { const s = localStorage.getItem('inicioCaja'); return s ? JSON.parse(s) : null; } catch { return null; }
   });
   const [cajaId, setCajaId] = useState(() => {
-    const saved = localStorage.getItem('cajaId');
-    return saved ? parseInt(saved) : null;
+    const s = localStorage.getItem('cajaId'); return s ? parseInt(s) : null;
   });
-  const [ventasDelDia, setVentasDelDia] = useState([]);
-  // Refs a los componentes DenomGrid (manejan su propio estado)
-  const denomInicioRef = useRef();
-  const denomCierreRef = useRef();
+  const [cierreKey, setCierreKey] = useState(0);
   const [cierreTotalContado, setCierreTotalContado] = useState(() => {
     try {
-      const saved = localStorage.getItem('cierre-denominaciones');
-      if (saved) return calcDenomTotal({ ...DENOM_INIT, ...JSON.parse(saved) });
+      const s = localStorage.getItem('cierre-denominaciones');
+      if (s) {
+        const vals = JSON.parse(s);
+        const config = [20000,10000,2000,1000,500,200,100,50,20,10];
+        const keys = ['d20000','d10000','d2000','d1000','d500','d200','d100','d50','d20','d10'];
+        return keys.reduce((acc, k, i) => acc + (Number(vals[k]) || 0) * config[i], 0);
+      }
     } catch(e) {}
     return 0;
   });
-  const [cierreKey, setCierreKey] = useState(0); // cambiar para resetear DenomGrid cierre
 
-  const calcularTotalCierre = () => cierreTotalContado;
+  const denomInicioRef = useRef();
+  const denomCierreRef = useRef();
 
-  // Retiros: registros parciales de retirada de efectivo
+  // ── Estado de retiros / gastos ─────────────────────────────────────────────
   const [retiros, setRetiros] = useState([]);
   const [nuevoRetiroMonto, setNuevoRetiroMonto] = useState('');
   const [nuevoRetiroDesc, setNuevoRetiroDesc] = useState('');
-
-  // Gastos: registros de gastos/egresos del día
-  const [gastos, setGastos] = useState([]);
-  const [nuevoGastoMonto, setNuevoGastoMonto] = useState('');
-  const [nuevoGastoDesc, setNuevoGastoDesc] = useState('');
-  const [mostrarFormGastos, setMostrarFormGastos] = useState(false);
-  
-  // Dashboard: día seleccionado para ver detalles
-  const [diaSeleccionado, setDiaSeleccionado] = useState(null);
-  const [detalleDashboard, setDetalleDashboard] = useState(null); // 'ventas' | 'productos' | null
-  const [calMes, setCalMes] = useState(new Date().getMonth());
-  const [calAño, setCalAño] = useState(new Date().getFullYear());
-
-  useEffect(() => {
-    try {
-      const storedGastos = localStorage.getItem('gastos');
-      if (storedGastos) setGastos(JSON.parse(storedGastos));
-    } catch (e) {
-      // ignore
-    }
-  }, []);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('gastos', JSON.stringify(gastos));
-    } catch (e) {
-      // ignore
-    }
-  }, [retiros, gastos]);
-
-  const sumarRetiros = () => retiros.reduce((s, r) => s + (parseFloat(r.monto) || 0), 0);
-  const sumarGastos = () => gastos.reduce((s, g) => s + (parseFloat(g.monto) || 0), 0);
-
   const [retiroEditandoIdx, setRetiroEditandoIdx] = useState(null);
   const [editandoMonto, setEditandoMonto] = useState('');
   const [editandoDesc, setEditandoDesc] = useState('');
-  const [mostrarIngresoForm, setMostrarIngresoForm] = useState(false);
+
   const [ingresoMonto, setIngresoMonto] = useState('');
   const [ingresoDesc, setIngresoDesc] = useState('');
   const [ingresoMetodo, setIngresoMetodo] = useState('EFECTIVO');
 
-  // Determinar si el usuario tiene permisos de administrador para retiros
+  const [gastos, setGastos] = useState([]);
+  const [nuevoGastoMonto, setNuevoGastoMonto] = useState('');
+  const [nuevoGastoDesc, setNuevoGastoDesc] = useState('');
+
+  // ── Estado del dashboard ───────────────────────────────────────────────────
+  const [periodoSeleccionado, setPeriodoSeleccionado] = useState('HOY');
+  const [ventasDelDia, setVentasDelDia] = useState([]);
+  const [diaSeleccionado, setDiaSeleccionado] = useState(null);
+  const [detalleDashboard, setDetalleDashboard] = useState(null);
+  const [calMes, setCalMes] = useState(new Date().getMonth());
+  const [calAño, setCalAño] = useState(new Date().getFullYear());
+
   const isAdmin = role && typeof role === 'string' && role.toLowerCase().includes('admin');
 
-  // Convierte una fecha UTC a fecha local en formato YYYY-MM-DD
-  const fechaLocal = (fechaStr) => {
-    if (!fechaStr) return '';
-    const d = new Date(fechaStr);
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  // ── Helpers ────────────────────────────────────────────────────────────────
+  const generarPasswordAleatoria = () => {
+    const adj = ['verde','dulce','rapido','fuerte','lindo','nuevo'];
+    const num = Math.floor(100 + Math.random() * 900);
+    return adj[Math.floor(Math.random() * adj.length)] + num;
   };
 
-  // ========== FUNCIONES DE API ==========
+  const exportarRetirosCSV = () => {
+    if (retiros.length === 0) { alert('No hay retiros para exportar'); return; }
+    const headers = ['fecha','descripcion','monto','usuario'];
+    const rows = retiros.map(r => [new Date(r.fecha).toISOString(), (r.descripcion||''), r.monto, (r.usuario||'')]);
+    const csv = [headers.join(','), ...rows.map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(','))].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = `retiros-${new Date().toISOString().slice(0,10)}.csv`; a.style.display='none';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
 
+  const navClear = () => {
+    setMostrarDashboard(false); setMostrarCaja(false); setMostrarRetiros(false);
+    setMostrarGestionProductos(false); setMostrarGestionUsuarios(false);
+    setMostrarHistorialCajas(false); setMostrarMiTurno(false); setMostrarHistorialTurnos(false);
+  };
+
+  // ── Efectos ────────────────────────────────────────────────────────────────
+  useEffect(() => {
+    try {
+      const storedGastos = localStorage.getItem('gastos');
+      if (storedGastos) setGastos(JSON.parse(storedGastos));
+    } catch (e) {}
+  }, []);
+
+  useEffect(() => {
+    try { localStorage.setItem('gastos', JSON.stringify(gastos)); } catch (e) {}
+  }, [retiros, gastos]);
+
+  useEffect(() => {
+    try {
+      const open = localStorage.getItem('cajaAbierta') === 'true';
+      const inicio = localStorage.getItem('inicioCaja');
+      const idCaja = localStorage.getItem('cajaId');
+      setCajaAbierta(open);
+      setInicioCaja(inicio ? JSON.parse(inicio) : null);
+      if (idCaja) setCajaId(Number(idCaja));
+      if (!open) setMostrarCaja(false);
+    } catch (e) {}
+  }, []);
+
+  useEffect(() => {
+    if (user) {
+      if (!cajaAbierta) setMostrarCaja(true);
+    } else {
+      setMostrarCaja(false); setMostrarDashboard(false);
+    }
+  }, [user, cajaAbierta]);
+
+  useEffect(() => {
+    if (user && token) {
+      const hoy = new Date();
+      apiCargarVentasDelDia(hoy.getMonth(), hoy.getFullYear());
+      cargarRetiros();
+      cargarProductos();
+      cargarCajaDesdeDB();
+      abrirTurno();
+    }
+  }, [user, token]); // eslint-disable-line
+
+  useEffect(() => {
+    if (user && token && mostrarDashboard) {
+      apiCargarVentasDelDia(calMes, calAño);
+      const intervalo = setInterval(() => apiCargarVentasDelDia(calMes, calAño), 30000);
+      return () => clearInterval(intervalo);
+    }
+  }, [user, token, mostrarDashboard, calMes, calAño]); // eslint-disable-line
+
+  // ── API: Caja ──────────────────────────────────────────────────────────────
+  const cargarCajaDesdeDB = async () => {
+    const tokenActual = localStorage.getItem('auth_token');
+    if (!tokenActual) return;
+    try {
+      const res = await fetch(`${API_URL}/cajas/abierta`, { headers: { 'Authorization': `Bearer ${tokenActual}` } });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.caja) {
+        const caja = data.caja;
+        setCajaId(caja.id);
+        setCajaAbierta(true);
+        const denoms = caja.denominaciones_inicio || {};
+        const montoInicial = parseFloat(caja.monto_inicial) || 0;
+        const datosCaja = { fecha: caja.fecha_apertura, montoInicial, denominaciones: denoms };
+        setInicioCaja(datosCaja);
+        localStorage.setItem('cajaAbierta', 'true');
+        localStorage.setItem('cajaId', String(caja.id));
+        localStorage.setItem('inicioCaja', JSON.stringify(datosCaja));
+      } else {
+        setCajaAbierta(false); setCajaId(null); setInicioCaja(null);
+        localStorage.removeItem('cajaAbierta'); localStorage.removeItem('cajaId'); localStorage.removeItem('inicioCaja');
+      }
+    } catch (e) { console.error('Error al cargar caja desde DB:', e); }
+  };
+
+  const confirmarInicioCaja = async () => {
+    const total = denomInicioRef.current?.getTotal() ?? 0;
+    if (total === 0) { alert('Debe ingresar al menos una denominación'); return; }
+    const v = denomInicioRef.current.getValues();
+    const denominaciones = { billete20000: v.d20000, billete10000: v.d10000, billete2000: v.d2000, billete1000: v.d1000, billete500: v.d500, billete200: v.d200, billete100: v.d100, moneda50: v.d50, moneda20: v.d20, moneda10: v.d10 };
+    const datosCaja = { fecha: new Date().toISOString(), montoInicial: total, denominaciones, iniciadoPor: user?.username ?? null };
+    const tokenActual = localStorage.getItem('auth_token');
+    try {
+      const res = await fetch(`${API_URL}/cajas/abrir`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${tokenActual}` },
+        body: JSON.stringify({ usuario_id: user.id, monto_inicial: total, denominaciones_inicio: denominaciones })
+      });
+      const data = await res.json();
+      if (!res.ok) { alert(data.error || 'Error al abrir caja'); return; }
+      setCajaId(data.caja.id);
+      localStorage.setItem('cajaId', String(data.caja.id));
+    } catch (e) { alert('Error de conexión al abrir caja'); return; }
+    setInicioCaja(datosCaja);
+    setCajaAbierta(true);
+    setMostrarCaja(false);
+    localStorage.setItem('cajaAbierta', 'true');
+    localStorage.setItem('inicioCaja', JSON.stringify(datosCaja));
+    alert(`Caja abierta exitosamente\nMonto inicial: $${total.toLocaleString()}`);
+  };
+
+  const confirmarCierreCaja = async () => {
+    const resumen = calcularResumenCaja(inicioCaja, ventasDelDia, retiros, gastos, cierreTotalContado);
+    const tokenActual = localStorage.getItem('auth_token');
+    const idCaja = cajaId || localStorage.getItem('cajaId');
+    const hoy = new Date();
+    const fechaHoy = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`;
+    const fechaDesdeApertura = inicioCaja?.fecha ? fechaLocal(inicioCaja.fecha) : fechaHoy;
+    const ventasHoy = ventasDelDia.filter(v => fechaLocal(v.fecha) >= fechaDesdeApertura && v.estado !== 'cancelada');
+
+    if (idCaja) {
+      try {
+        const denomCierre = denomCierreRef.current?.getValues() || {};
+        await fetch(`${API_URL}/cajas/${idCaja}/cerrar`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${tokenActual}` },
+          body: JSON.stringify({ monto_cierre: resumen.totalReal, denominaciones_cierre: denomCierre, diferencia: resumen.diferencia, total_ventas: resumen.totalVentas, total_retiros: resumen.retiros, total_gastos: resumen.gastos })
+        });
+      } catch (e) { console.error('Error al cerrar caja en BD:', e); }
+    }
+
+    imprimirReporteCierre(resumen, ventasHoy, retiros, inicioCaja);
+
+    setCajaAbierta(false); setMostrarCaja(false); setCajaId(null);
+    setCierreKey(k => k + 1); setCierreTotalContado(0);
+    setVentasDelDia([]); setInicioCaja(null); setRetiros([]); setGastos([]);
+    localStorage.removeItem('cajaAbierta'); localStorage.removeItem('inicioCaja');
+    localStorage.removeItem('cajaId'); localStorage.removeItem('retiros');
+    localStorage.removeItem('gastos'); localStorage.removeItem('cierre-denominaciones');
+  };
+
+  const cargarHistorialCajas = async () => {
+    const tokenActual = localStorage.getItem('auth_token');
+    if (!tokenActual) return;
+    try {
+      const res = await fetch(`${API_URL}/cajas/historial?limite=50`, { headers: { 'Authorization': `Bearer ${tokenActual}` } });
+      if (res.ok) { const data = await res.json(); setHistorialCajas(data.cajas || []); }
+    } catch (e) { console.error('Error al cargar historial de cajas:', e); }
+  };
+
+  // ── API: Turnos ────────────────────────────────────────────────────────────
   const abrirTurno = async () => {
     const tokenActual = localStorage.getItem('auth_token');
     if (!tokenActual || !user) return;
@@ -209,10 +295,7 @@ function AppInner() {
         headers: { 'Authorization': `Bearer ${tokenActual}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ usuario_id: user.id })
       });
-      if (res.ok) {
-        const data = await res.json();
-        setTurnoActivo(data.turno);
-      }
+      if (res.ok) { const data = await res.json(); setTurnoActivo(data.turno); }
     } catch (e) { console.error('Error al abrir turno:', e); }
   };
 
@@ -220,63 +303,17 @@ function AppInner() {
     const tokenActual = localStorage.getItem('auth_token');
     if (!tokenActual || !turnoActivo) return;
     try {
-      await fetch(`${API_URL}/turnos/${turnoActivo.id}/cerrar`, {
-        method: 'PUT',
-        headers: { 'Authorization': `Bearer ${tokenActual}` }
-      });
+      await fetch(`${API_URL}/turnos/${turnoActivo.id}/cerrar`, { method: 'PUT', headers: { 'Authorization': `Bearer ${tokenActual}` } });
       setTurnoActivo(null);
     } catch (e) { console.error('Error al cerrar turno:', e); }
-  };
-
-  const cargarCajaDesdeDB = async () => {
-    const tokenActual = localStorage.getItem('auth_token');
-    if (!tokenActual) return;
-    try {
-      const res = await fetch(`${API_URL}/cajas/abierta`, {
-        headers: { 'Authorization': `Bearer ${tokenActual}` }
-      });
-      if (!res.ok) return;
-      const data = await res.json();
-      if (data.caja) {
-        const caja = data.caja;
-        setCajaId(caja.id);
-        setCajaAbierta(true);
-        const denoms = caja.denominaciones_inicio || {};
-        const montoInicial = parseFloat(caja.monto_inicial) || 0;
-        const datosCaja = {
-          fecha: caja.fecha_apertura,
-          montoInicial,
-          denominaciones: denoms
-        };
-        setInicioCaja(datosCaja);
-        localStorage.setItem('cajaAbierta', 'true');
-        localStorage.setItem('cajaId', String(caja.id));
-        localStorage.setItem('inicioCaja', JSON.stringify(datosCaja));
-      } else {
-        // No hay caja abierta en DB, limpiar estado local
-        setCajaAbierta(false);
-        setCajaId(null);
-        setInicioCaja(null);
-        localStorage.removeItem('cajaAbierta');
-        localStorage.removeItem('cajaId');
-        localStorage.removeItem('inicioCaja');
-      }
-    } catch (e) {
-      console.error('Error al cargar caja desde DB:', e);
-    }
   };
 
   const cargarTurnoActivo = async () => {
     const tokenActual = localStorage.getItem('auth_token');
     if (!tokenActual || !user) return;
     try {
-      const res = await fetch(`${API_URL}/turnos/activo?usuario_id=${user.id}`, {
-        headers: { 'Authorization': `Bearer ${tokenActual}` }
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setTurnoActivo(data.turno);
-      }
+      const res = await fetch(`${API_URL}/turnos/activo?usuario_id=${user.id}`, { headers: { 'Authorization': `Bearer ${tokenActual}` } });
+      if (res.ok) { const data = await res.json(); setTurnoActivo(data.turno); }
     } catch (e) { console.error('Error al cargar turno:', e); }
   };
 
@@ -284,13 +321,8 @@ function AppInner() {
     const tokenActual = localStorage.getItem('auth_token');
     if (!tokenActual) return;
     try {
-      const res = await fetch(`${API_URL}/turnos/historial?limite=60`, {
-        headers: { 'Authorization': `Bearer ${tokenActual}` }
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setHistorialTurnos(data.turnos || []);
-      }
+      const res = await fetch(`${API_URL}/turnos/historial?limite=60`, { headers: { 'Authorization': `Bearer ${tokenActual}` } });
+      if (res.ok) { const data = await res.json(); setHistorialTurnos(data.turnos || []); }
     } catch (e) { console.error('Error al cargar historial de turnos:', e); }
   };
 
@@ -298,38 +330,24 @@ function AppInner() {
     const tokenActual = localStorage.getItem('auth_token');
     if (!tokenActual) return;
     try {
-      const res = await fetch(`${API_URL}/turnos/${turnoId}/ventas`, {
-        headers: { 'Authorization': `Bearer ${tokenActual}` }
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setTurnoDetalle(data);
-      }
+      const res = await fetch(`${API_URL}/turnos/${turnoId}/ventas`, { headers: { 'Authorization': `Bearer ${tokenActual}` } });
+      if (res.ok) { const data = await res.json(); setTurnoDetalle(data); }
     } catch (e) { console.error('Error al cargar detalle de turno:', e); }
   };
 
-  const generarPasswordAleatoria = () => {
-    const adj = ['verde','dulce','rapido','fuerte','lindo','nuevo'];
-    const num = Math.floor(100 + Math.random() * 900);
-    return adj[Math.floor(Math.random() * adj.length)] + num;
-  };
-
+  // ── API: Usuarios ──────────────────────────────────────────────────────────
   const cargarUsuarios = async () => {
     const tokenActual = localStorage.getItem('auth_token');
     if (!tokenActual) return;
     try {
-      const res = await fetch(`${API_URL}/usuarios`, {
-        headers: { 'Authorization': `Bearer ${tokenActual}` }
-      });
+      const res = await fetch(`${API_URL}/usuarios`, { headers: { 'Authorization': `Bearer ${tokenActual}` } });
       if (res.ok) setUsuarios(await res.json());
     } catch (e) { console.error('Error al cargar usuarios:', e); }
   };
 
   const crearUsuario = async () => {
     const { nombre, email, password, rol } = nuevoUsuario;
-    if (!nombre.trim() || !email.trim() || !password.trim()) {
-      alert('Completá nombre, email y contraseña.'); return;
-    }
+    if (!nombre.trim() || !email.trim() || !password.trim()) { alert('Completá nombre, email y contraseña.'); return; }
     const tokenActual = localStorage.getItem('auth_token');
     try {
       const res = await fetch(`${API_URL}/usuarios`, {
@@ -341,10 +359,7 @@ function AppInner() {
         alert(`✅ Usuario "${nombre}" creado.\nContraseña: ${password}`);
         setNuevoUsuario({ nombre: '', email: '', password: '', rol: 'vendedor' });
         cargarUsuarios();
-      } else {
-        const err = await res.json();
-        alert('Error: ' + (err.error || 'No se pudo crear el usuario'));
-      }
+      } else { const err = await res.json(); alert('Error: ' + (err.error || 'No se pudo crear el usuario')); }
     } catch (e) { alert('Error de conexión'); }
   };
 
@@ -361,13 +376,8 @@ function AppInner() {
       });
       if (res.ok) {
         if (nuevaPasswordEdit.trim()) alert(`✅ Usuario actualizado.\nNueva contraseña: ${nuevaPasswordEdit.trim()}`);
-        setUsuarioEditando(null);
-        setNuevaPasswordEdit('');
-        cargarUsuarios();
-      } else {
-        const err = await res.json();
-        alert('Error: ' + (err.error || 'No se pudo actualizar'));
-      }
+        setUsuarioEditando(null); setNuevaPasswordEdit(''); cargarUsuarios();
+      } else { const err = await res.json(); alert('Error: ' + (err.error || 'No se pudo actualizar')); }
     } catch (e) { alert('Error de conexión'); }
   };
 
@@ -375,382 +385,28 @@ function AppInner() {
     if (!window.confirm(`¿Eliminar al usuario "${nombre}"? Esta acción no se puede deshacer.`)) return;
     const tokenActual = localStorage.getItem('auth_token');
     try {
-      const res = await fetch(`${API_URL}/usuarios/${id}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${tokenActual}` }
-      });
+      const res = await fetch(`${API_URL}/usuarios/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${tokenActual}` } });
       if (res.ok) cargarUsuarios();
       else alert('Error al eliminar usuario');
     } catch (e) { alert('Error de conexión'); }
   };
 
-  const cargarHistorialCajas = async () => {
-    const tokenActual = localStorage.getItem('auth_token');
-    if (!tokenActual) return;
-    try {
-      const res = await fetch(`${API_URL}/cajas/historial?limite=50`, {
-        headers: { 'Authorization': `Bearer ${tokenActual}` }
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setHistorialCajas(data.cajas || []);
-      }
-    } catch (e) {
-      console.error('Error al cargar historial de cajas:', e);
-    }
-  };
-
+  // ── API: Productos ─────────────────────────────────────────────────────────
   const cargarProductos = async () => {
     const tokenActual = localStorage.getItem('auth_token');
     if (!tokenActual) return;
     try {
-      const res = await fetch(`${API_URL}/productos`, {
-        headers: { 'Authorization': `Bearer ${tokenActual}` }
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setProductos(data.map(p => ({ ...p, precio: parseFloat(p.precio_unitario) })));
-      }
-    } catch (e) {
-      console.error('Error al cargar productos:', e);
-    }
+      const res = await fetch(`${API_URL}/productos`, { headers: { 'Authorization': `Bearer ${tokenActual}` } });
+      if (res.ok) { const data = await res.json(); setProductos(data.map(p => ({ ...p, precio: parseFloat(p.precio_unitario) }))); }
+    } catch (e) { console.error('Error al cargar productos:', e); }
   };
-
-  const apiGuardarVenta = async (venta) => {
-    if (!user) {
-      console.error('❌ No hay usuario en sesión');
-      alert('Error: No hay sesión activa. Por favor, inicie sesión.');
-      return false;
-    }
-
-    if (!token) {
-      console.error('❌ No hay token. Usuario:', user);
-      alert('Error: Token no disponible. Por favor, cierre sesión y vuelva a iniciar.');
-      return false;
-    }
-
-    console.log('📤 Guardando venta con usuario:', user.id, 'Token disponible:', token ? '✓' : '✗');
-
-    try {
-      const response = await fetch(`${API_URL}/ventas`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          usuario_id: user.id,
-          items: venta.items,
-          total: venta.total,
-          pagos: venta.pagos,
-          descripcion: `Venta de ${venta.items.length} productos`
-        })
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        console.error('❌ Error HTTP al guardar venta:', response.status, error);
-        alert(`Error: ${error.error || 'No se pudo guardar la venta'}`);
-        return false;
-      }
-
-      const data = await response.json();
-      console.log('✅ Venta guardada en BD:', data);
-      return data.venta_id;
-    } catch (error) {
-      console.error('❌ Error de conexión al guardar venta:', error);
-      alert(`Error de conexión: ${error.message}`);
-      return null;
-    }
-  };
-
-  const apiModificarVenta = async (id, items, total, pagos) => {
-    if (!user || !token) return false;
-    try {
-      const response = await fetch(`${API_URL}/ventas/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({ items, total, pagos })
-      });
-      if (!response.ok) {
-        const text = await response.text();
-        try {
-          const err = JSON.parse(text);
-          alert(`Error: ${err.error || 'No se pudo modificar la venta'}`);
-        } catch {
-          alert(`Error del servidor (${response.status}). Verificá que el backend esté corriendo.`);
-        }
-        return false;
-      }
-      return true;
-    } catch (error) {
-      alert('No se pudo conectar con el servidor. Verificá que el backend esté corriendo.');
-      return false;
-    }
-  };
-
-  const eliminarVenta = async (id) => {
-    if (!window.confirm('¿Estás seguro que querés eliminar esta venta?')) return;
-    try {
-      const response = await fetch(`${API_URL}/ventas/${id}/cancelar`, {
-        method: 'PUT',
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (response.ok) {
-        setVentasDelDia(prev => prev.filter(v => v.id !== id));
-      } else {
-        alert('No se pudo eliminar la venta.');
-      }
-    } catch {
-      alert('Error de conexión.');
-    }
-  };
-
-  const abrirEdicionVenta = (venta) => {
-    setVentaEditando({
-      id: venta.id,
-      items: (venta.items || []).map(it => ({ ...it, cantidad: Number(it.cantidad) })),
-      pagos: (venta.pagos || []).map(p => ({ ...p, monto: Number(p.monto) }))
-    });
-    setProductoAgregarEdit('');
-  };
-
-  const guardarEdicionVenta = async () => {
-    const totalItems = ventaEditando.items.reduce((s, it) => s + (it.precio * it.cantidad), 0);
-    const totalPagos = ventaEditando.pagos.reduce((s, p) => s + Number(p.monto || 0), 0);
-    if (ventaEditando.items.length === 0) {
-      alert('Debe haber al menos un producto en la venta');
-      return;
-    }
-    if (ventaEditando.pagos.length === 0) {
-      alert('Debe haber al menos un medio de pago');
-      return;
-    }
-    if (Math.abs(totalItems - totalPagos) > 0.01) {
-      alert(`El total de pagos ($${totalPagos.toLocaleString()}) no coincide con el total de productos ($${totalItems.toLocaleString()})`);
-      return;
-    }
-    const ok = await apiModificarVenta(ventaEditando.id, ventaEditando.items, totalItems, ventaEditando.pagos);
-    if (ok) {
-      setVentasDelDia(prev => prev.map(v =>
-        v.id === ventaEditando.id
-          ? { ...v, items: ventaEditando.items, pagos: ventaEditando.pagos, total: totalItems }
-          : v
-      ));
-      setVentaEditando(null);
-    }
-  };
-
-  // Cargar ventas del mes visible en el calendario
-  const apiCargarVentasDelDia = async (mesVer = calMes, añoVer = calAño) => {
-    const tokenActual = localStorage.getItem('auth_token');
-    if (!user || !tokenActual) return;
-    try {
-      const ultimoDia = new Date(añoVer, mesVer + 1, 0).getDate();
-      const fechaInicio = `${añoVer}-${String(mesVer + 1).padStart(2, '0')}-01`;
-      const fechaFin = `${añoVer}-${String(mesVer + 1).padStart(2, '0')}-${String(ultimoDia).padStart(2, '0')}`;
-
-      const response = await fetch(`${API_URL}/ventas?fecha_inicio=${fechaInicio}&fecha_fin=${fechaFin}`, {
-        headers: { 'Authorization': `Bearer ${tokenActual}` }
-      });
-
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({}));
-        if (response.status === 403) {
-          alert('Tu sesión expiró. Por favor volvé a iniciar sesión.');
-          logout();
-          return;
-        }
-        console.error('Error al cargar ventas:', err);
-        return;
-      }
-
-      const data = await response.json();
-      if (data && Array.isArray(data.ventas)) {
-        const ventasFormateadas = data.ventas.map(v => {
-          let items = v.items;
-          let pagos = v.pagos;
-          try {
-            items = typeof items === 'string' && items.trim() ? JSON.parse(items) : (items || []);
-          } catch (e) {
-            items = [];
-          }
-          try {
-            pagos = typeof pagos === 'string' && pagos.trim() ? JSON.parse(pagos) : (pagos || []);
-          } catch (e) {
-            pagos = [];
-          }
-          return { ...v, items, pagos };
-        });
-        setVentasDelDia(ventasFormateadas);
-      }
-    } catch (error) {
-      console.error('Error al obtener ventas:', error);
-    }
-  };
-
-  // Cargar ventas, retiros, productos y abrir turno al iniciar sesión
-  useEffect(() => {
-    if (user && token) {
-      const hoy = new Date();
-      apiCargarVentasDelDia(hoy.getMonth(), hoy.getFullYear());
-      cargarRetiros();
-      cargarProductos();
-      cargarCajaDesdeDB();
-      abrirTurno();
-    }
-  }, [user, token]);
-
-  // Cargar ventas del mes visible al entrar al dashboard o cambiar de mes
-  useEffect(() => {
-    if (user && token && mostrarDashboard) {
-      apiCargarVentasDelDia(calMes, calAño);
-      const intervalo = setInterval(() => apiCargarVentasDelDia(calMes, calAño), 30000);
-      return () => clearInterval(intervalo);
-    }
-  }, [user, token, mostrarDashboard, calMes, calAño]);
-
-  const cargarRetiros = async () => {
-    const tokenActual = localStorage.getItem('auth_token');
-    if (!tokenActual) return;
-    try {
-      const hoy = new Date();
-      const fecha = `${hoy.getFullYear()}-${String(hoy.getMonth()+1).padStart(2,'0')}-${String(hoy.getDate()).padStart(2,'0')}`;
-      const res = await fetch(`${API_URL}/retiros?fecha_inicio=${fecha}&fecha_fin=${fecha}`, {
-        headers: { 'Authorization': `Bearer ${tokenActual}` }
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setRetiros(data.retiros || []);
-      }
-    } catch (e) {
-      console.error('Error al cargar retiros:', e);
-    }
-  };
-
-  const agregarRetiro = async () => {
-    const monto = parseFloat(nuevoRetiroMonto);
-    if (!monto || monto <= 0) { alert('Ingrese un monto válido para el retiro'); return; }
-    const hoyStr = (() => { const h = new Date(); return `${h.getFullYear()}-${String(h.getMonth()+1).padStart(2,'0')}-${String(h.getDate()).padStart(2,'0')}`; })();
-    const fechaDesdeApertura = inicioCaja?.fecha ? fechaLocal(inicioCaja.fecha) : hoyStr;
-    const montoDisponible = (inicioCaja ? inicioCaja.montoInicial : 0) + ventasDelDia.filter(v => fechaLocal(v.fecha) >= fechaDesdeApertura).reduce((s, v) => {
-      const efectivo = (v.pagos || []).reduce((ps, p) => p.metodo === 'EFECTIVO' ? ps + (parseFloat(p.monto) || 0) : ps, 0);
-      return s + efectivo;
-    }, 0) - sumarRetiros();
-    if (monto > montoDisponible) {
-      alert(`El monto excede el efectivo disponible ($${montoDisponible.toLocaleString()}). No se puede registrar el retiro.`);
-      return;
-    }
-    const tokenActual = localStorage.getItem('auth_token');
-    try {
-      const res = await fetch(`${API_URL}/retiros`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${tokenActual}` },
-        body: JSON.stringify({ usuario_id: user.id, monto, descripcion: nuevoRetiroDesc || 'Retiro' })
-      });
-      if (res.ok) {
-        await cargarRetiros();
-        setNuevoRetiroMonto('');
-        setNuevoRetiroDesc('');
-      } else {
-        alert('Error al guardar el retiro');
-      }
-    } catch (e) {
-      alert('Error de conexión');
-    }
-  };
-
-  const iniciarEdicionRetiro = (idx) => {
-    if (!isAdmin) { alert('No tiene permisos para editar retiros'); return; }
-    setRetiroEditandoIdx(idx);
-    setEditandoMonto(String(retiros[idx].monto));
-    setEditandoDesc(retiros[idx].descripcion || '');
-  };
-
-  const guardarEdicionRetiro = (idx) => {
-    if (!isAdmin) { alert('No tiene permisos para editar retiros'); return; }
-    const monto = parseFloat(editandoMonto);
-    if (!monto || monto <= 0) { alert('Ingrese un monto válido'); return; }
-    const copia = [...retiros];
-    copia[idx] = { ...copia[idx], monto, descripcion: editandoDesc || 'Retiro' };
-    setRetiros(copia);
-    setRetiroEditandoIdx(null);
-    setEditandoMonto('');
-    setEditandoDesc('');
-  };
-
-  const cancelarEdicionRetiro = () => {
-    setRetiroEditandoIdx(null);
-    setEditandoMonto('');
-    setEditandoDesc('');
-  };
-
-  const iniciarIngresoExtra = () => {
-    setMostrarIngresoForm(true);
-    setIngresoMonto('');
-    setIngresoDesc('');
-    setIngresoMetodo('EFECTIVO');
-  };
-
-  const cancelarIngresoExtra = () => {
-    setMostrarIngresoForm(false);
-    setIngresoMonto('');
-    setIngresoDesc('');
-    setIngresoMetodo('EFECTIVO');
-  };
-
-  const guardarIngresoExtra = () => {
-    const monto = parseFloat(ingresoMonto);
-    if (!monto || monto <= 0) { alert('Ingrese un monto válido para el ingreso'); return; }
-    const nuevaVenta = {
-      id: Date.now(),
-      fecha: new Date().toISOString(),
-      items: [],
-      total: monto,
-      pagos: [{ metodo: ingresoMetodo, monto }],
-      descripcion: ingresoDesc || 'Ingreso extra',
-      usuario: user?.nombre || null
-    };
-    setVentasDelDia([...ventasDelDia, nuevaVenta]);
-    setIngresoMonto('');
-    setIngresoDesc('');
-    setIngresoMetodo('EFECTIVO');
-    alert(`Ingreso registrado: $${monto.toLocaleString()} (${ingresoMetodo})`);
-  };
-
-  const eliminarRetiro = async (idx) => {
-    if (!isAdmin) { alert('No tiene permisos para eliminar retiros'); return; }
-    if (!window.confirm('¿Eliminar este retiro?')) return;
-    const retiro = retiros[idx];
-    const tokenActual = localStorage.getItem('auth_token');
-    try {
-      const res = await fetch(`${API_URL}/retiros/${retiro.id}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${tokenActual}` }
-      });
-      if (res.ok) {
-        await cargarRetiros();
-      } else {
-        alert('Error al eliminar el retiro');
-      }
-    } catch (e) {
-      alert('Error de conexión');
-    }
-  };
-
-  const [todosProductos, setTodosProductos] = useState([]);
 
   const cargarTodosProductos = async () => {
     const tokenActual = localStorage.getItem('auth_token');
     if (!tokenActual) return;
     try {
-      const res = await fetch(`${API_URL}/productos?todos=true`, {
-        headers: { 'Authorization': `Bearer ${tokenActual}` }
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setTodosProductos(data);
-      }
+      const res = await fetch(`${API_URL}/productos?todos=true`, { headers: { 'Authorization': `Bearer ${tokenActual}` } });
+      if (res.ok) { const data = await res.json(); setTodosProductos(data); }
     } catch (e) { console.error('Error:', e); }
   };
 
@@ -781,10 +437,8 @@ function AppInner() {
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${tokenActual}` },
         body: JSON.stringify({ nombre, precio_unitario: parseFloat(precio_unitario), categoria })
       });
-      if (res.ok) {
-        await cargarProductos(); await cargarTodosProductos();
-        setProductoEditando(null);
-      } else { alert('Error al editar producto'); }
+      if (res.ok) { await cargarProductos(); await cargarTodosProductos(); setProductoEditando(null); }
+      else { alert('Error al editar producto'); }
     } catch (e) { alert('Error de conexión'); }
   };
 
@@ -801,117 +455,214 @@ function AppInner() {
     } catch (e) { alert('Error de conexión'); }
   };
 
-  const exportarRetirosCSV = () => {
-    if (retiros.length === 0) { alert('No hay retiros para exportar'); return; }
-    const headers = ['fecha','descripcion','monto','usuario'];
-    const rows = retiros.map(r => [new Date(r.fecha).toISOString(), (r.descripcion||''), r.monto, (r.usuario||'')]);
-    const csv = [headers.join(','), ...rows.map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(','))].join('\n');
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url; a.download = `retiros-${new Date().toISOString().slice(0,10)}.csv`; a.style.display='none';
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+  // ── API: Ventas ────────────────────────────────────────────────────────────
+  const apiGuardarVenta = async (venta) => {
+    if (!user || !token) { alert('Error: No hay sesión activa.'); return false; }
+    try {
+      const response = await fetch(`${API_URL}/ventas`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ usuario_id: user.id, items: venta.items, total: venta.total, pagos: venta.pagos, descripcion: `Venta de ${venta.items.length} productos` })
+      });
+      if (!response.ok) { const error = await response.json(); alert(`Error: ${error.error || 'No se pudo guardar la venta'}`); return false; }
+      const data = await response.json();
+      return data.venta_id;
+    } catch (error) { alert(`Error de conexión: ${error.message}`); return null; }
   };
 
-  // ========== FUNCIONES DE GASTOS ==========
+  const apiModificarVenta = async (id, items, total, pagos) => {
+    if (!user || !token) return false;
+    try {
+      const response = await fetch(`${API_URL}/ventas/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ items, total, pagos })
+      });
+      if (!response.ok) {
+        const text = await response.text();
+        try { const err = JSON.parse(text); alert(`Error: ${err.error || 'No se pudo modificar la venta'}`); }
+        catch { alert(`Error del servidor (${response.status}).`); }
+        return false;
+      }
+      return true;
+    } catch (error) { alert('No se pudo conectar con el servidor.'); return false; }
+  };
+
+  const eliminarVenta = async (id) => {
+    if (!window.confirm('¿Estás seguro que querés eliminar esta venta?')) return;
+    try {
+      const response = await fetch(`${API_URL}/ventas/${id}/cancelar`, { method: 'PUT', headers: { 'Authorization': `Bearer ${token}` } });
+      if (response.ok) setVentasDelDia(prev => prev.filter(v => v.id !== id));
+      else alert('No se pudo eliminar la venta.');
+    } catch { alert('Error de conexión.'); }
+  };
+
+  const abrirEdicionVenta = (venta) => {
+    setVentaEditando({
+      id: venta.id,
+      items: (venta.items || []).map(it => ({ ...it, cantidad: Number(it.cantidad) })),
+      pagos: (venta.pagos || []).map(p => ({ ...p, monto: Number(p.monto) }))
+    });
+    setProductoAgregarEdit('');
+  };
+
+  const guardarEdicionVenta = async () => {
+    const totalItems = ventaEditando.items.reduce((s, it) => s + (it.precio * it.cantidad), 0);
+    const totalPagos = ventaEditando.pagos.reduce((s, p) => s + Number(p.monto || 0), 0);
+    if (ventaEditando.items.length === 0) { alert('Debe haber al menos un producto'); return; }
+    if (ventaEditando.pagos.length === 0) { alert('Debe haber al menos un medio de pago'); return; }
+    if (Math.abs(totalItems - totalPagos) > 0.01) { alert(`Los totales no coinciden`); return; }
+    const ok = await apiModificarVenta(ventaEditando.id, ventaEditando.items, totalItems, ventaEditando.pagos);
+    if (ok) {
+      setVentasDelDia(prev => prev.map(v => v.id === ventaEditando.id ? { ...v, items: ventaEditando.items, pagos: ventaEditando.pagos, total: totalItems } : v));
+      setVentaEditando(null);
+    }
+  };
+
+  const apiCargarVentasDelDia = async (mesVer = calMes, añoVer = calAño) => {
+    const tokenActual = localStorage.getItem('auth_token');
+    if (!user || !tokenActual) return;
+    try {
+      const ultimoDia = new Date(añoVer, mesVer + 1, 0).getDate();
+      const fechaInicio = `${añoVer}-${String(mesVer + 1).padStart(2, '0')}-01`;
+      const fechaFin = `${añoVer}-${String(mesVer + 1).padStart(2, '0')}-${String(ultimoDia).padStart(2, '0')}`;
+      const response = await fetch(`${API_URL}/ventas?fecha_inicio=${fechaInicio}&fecha_fin=${fechaFin}`, { headers: { 'Authorization': `Bearer ${tokenActual}` } });
+      if (!response.ok) {
+        if (response.status === 403) { alert('Tu sesión expiró. Por favor volvé a iniciar sesión.'); logout(); }
+        return;
+      }
+      const data = await response.json();
+      if (data && Array.isArray(data.ventas)) {
+        setVentasDelDia(data.ventas.map(v => {
+          let items = v.items, pagos = v.pagos;
+          try { items = typeof items === 'string' ? JSON.parse(items) : (items || []); } catch { items = []; }
+          try { pagos = typeof pagos === 'string' ? JSON.parse(pagos) : (pagos || []); } catch { pagos = []; }
+          return { ...v, items, pagos };
+        }));
+      }
+    } catch (error) { console.error('Error al obtener ventas:', error); }
+  };
+
+  // ── API: Retiros ───────────────────────────────────────────────────────────
+  const cargarRetiros = async () => {
+    const tokenActual = localStorage.getItem('auth_token');
+    if (!tokenActual) return;
+    try {
+      const hoy = new Date();
+      const fecha = `${hoy.getFullYear()}-${String(hoy.getMonth()+1).padStart(2,'0')}-${String(hoy.getDate()).padStart(2,'0')}`;
+      const res = await fetch(`${API_URL}/retiros?fecha_inicio=${fecha}&fecha_fin=${fecha}`, { headers: { 'Authorization': `Bearer ${tokenActual}` } });
+      if (res.ok) { const data = await res.json(); setRetiros(data.retiros || []); }
+    } catch (e) { console.error('Error al cargar retiros:', e); }
+  };
+
+  const agregarRetiro = async () => {
+    const monto = parseFloat(nuevoRetiroMonto);
+    if (!monto || monto <= 0) { alert('Ingrese un monto válido para el retiro'); return; }
+    const hoyStr = (() => { const h = new Date(); return `${h.getFullYear()}-${String(h.getMonth()+1).padStart(2,'0')}-${String(h.getDate()).padStart(2,'0')}`; })();
+    const fechaDesdeApertura = inicioCaja?.fecha ? fechaLocal(inicioCaja.fecha) : hoyStr;
+    const montoDisponible = (inicioCaja ? inicioCaja.montoInicial : 0) +
+      ventasDelDia.filter(v => fechaLocal(v.fecha) >= fechaDesdeApertura).reduce((s, v) => {
+        const ef = (v.pagos || []).reduce((ps, p) => p.metodo === 'EFECTIVO' ? ps + (parseFloat(p.monto) || 0) : ps, 0);
+        return s + ef;
+      }, 0) - retiros.reduce((s, r) => s + (parseFloat(r.monto) || 0), 0);
+    if (monto > montoDisponible) { alert(`El monto excede el efectivo disponible ($${montoDisponible.toLocaleString()}).`); return; }
+    const tokenActual = localStorage.getItem('auth_token');
+    try {
+      const res = await fetch(`${API_URL}/retiros`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${tokenActual}` },
+        body: JSON.stringify({ usuario_id: user.id, monto, descripcion: nuevoRetiroDesc || 'Retiro' })
+      });
+      if (res.ok) { await cargarRetiros(); setNuevoRetiroMonto(''); setNuevoRetiroDesc(''); }
+      else { alert('Error al guardar el retiro'); }
+    } catch (e) { alert('Error de conexión'); }
+  };
+
+  const iniciarEdicionRetiro = (idx) => {
+    if (!isAdmin) { alert('No tiene permisos para editar retiros'); return; }
+    setRetiroEditandoIdx(idx); setEditandoMonto(String(retiros[idx].monto)); setEditandoDesc(retiros[idx].descripcion || '');
+  };
+
+  const guardarEdicionRetiro = (idx) => {
+    if (!isAdmin) { alert('No tiene permisos para editar retiros'); return; }
+    const monto = parseFloat(editandoMonto);
+    if (!monto || monto <= 0) { alert('Ingrese un monto válido'); return; }
+    const copia = [...retiros];
+    copia[idx] = { ...copia[idx], monto, descripcion: editandoDesc || 'Retiro' };
+    setRetiros(copia); setRetiroEditandoIdx(null); setEditandoMonto(''); setEditandoDesc('');
+  };
+
+  const cancelarEdicionRetiro = () => { setRetiroEditandoIdx(null); setEditandoMonto(''); setEditandoDesc(''); };
+
+  const eliminarRetiro = async (idx) => {
+    if (!isAdmin) { alert('No tiene permisos para eliminar retiros'); return; }
+    if (!window.confirm('¿Eliminar este retiro?')) return;
+    const retiro = retiros[idx];
+    const tokenActual = localStorage.getItem('auth_token');
+    try {
+      const res = await fetch(`${API_URL}/retiros/${retiro.id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${tokenActual}` } });
+      if (res.ok) await cargarRetiros();
+      else alert('Error al eliminar el retiro');
+    } catch (e) { alert('Error de conexión'); }
+  };
+
+  // ── Gastos (local) ─────────────────────────────────────────────────────────
   const agregarGasto = () => {
     const monto = parseFloat(nuevoGastoMonto);
     if (!monto || monto <= 0) { alert('Ingrese un monto válido para el gasto'); return; }
     const nuevo = { monto, descripcion: nuevoGastoDesc || 'Gasto', fecha: new Date().toISOString(), usuario: user?.nombre || null };
     setGastos([...gastos, nuevo]);
-    setNuevoGastoMonto('');
-    setNuevoGastoDesc('');
+    setNuevoGastoMonto(''); setNuevoGastoDesc('');
     alert(`Gasto registrado: $${monto.toLocaleString()}`);
   };
 
   const eliminarGasto = (idx) => {
     if (!window.confirm('¿Eliminar este gasto?')) return;
-    const copia = [...gastos];
-    copia.splice(idx, 1);
-    setGastos(copia);
+    const copia = [...gastos]; copia.splice(idx, 1); setGastos(copia);
   };
 
-  const cancelarGasto = () => {
-    setMostrarFormGastos(false);
-    setNuevoGastoMonto('');
-    setNuevoGastoDesc('');
+  // ── Ingreso extra ──────────────────────────────────────────────────────────
+  const guardarIngresoExtra = () => {
+    const monto = parseFloat(ingresoMonto);
+    if (!monto || monto <= 0) { alert('Ingrese un monto válido para el ingreso'); return; }
+    const nuevaVenta = { id: Date.now(), fecha: new Date().toISOString(), items: [], total: monto, pagos: [{ metodo: ingresoMetodo, monto }], descripcion: ingresoDesc || 'Ingreso extra', usuario: user?.nombre || null };
+    setVentasDelDia([...ventasDelDia, nuevaVenta]);
+    setIngresoMonto(''); setIngresoDesc(''); setIngresoMetodo('EFECTIVO');
+    alert(`Ingreso registrado: $${monto.toLocaleString()} (${ingresoMetodo})`);
   };
 
-  // El dashboard usará datos reales cargados desde la BD en `ventasDelDia`.
-  // Se eliminan las ventas simuladas para evitar mostrar datos de ejemplo.
-
-  useEffect(() => {
-    try {
-      const open = localStorage.getItem('cajaAbierta') === 'true';
-      const inicio = localStorage.getItem('inicioCaja');
-      const idCaja = localStorage.getItem('cajaId');
-      setCajaAbierta(open);
-      setInicioCaja(inicio ? JSON.parse(inicio) : null);
-      if (idCaja) setCajaId(Number(idCaja));
-      if (!open) setMostrarCaja(false);
-    } catch (e) {
-      // ignore
-    }
-  }, []);
-
-  useEffect(() => {
-    if (user) {
-      if (!cajaAbierta) {
-        setMostrarCaja(true);
-      }
-    } else {
-      setMostrarCaja(false);
-      setMostrarDashboard(false);
-    }
-  }, [user, cajaAbierta]);
-
+  // ── Carrito ────────────────────────────────────────────────────────────────
   const agregarAlCarrito = (producto) => {
-    if (!cajaAbierta) {
-      alert('Debe abrir la caja antes de realizar ventas.');
-      setMostrarCaja(true);
-      return;
-    }
+    if (!cajaAbierta) { alert('Debe abrir la caja antes de realizar ventas.'); setMostrarCaja(true); return; }
     const existe = carrito.find(item => item.id === producto.id);
     if (existe) {
-      setCarrito(carrito.map(item =>
-        item.id === producto.id ? { ...item, cantidad: item.cantidad + 1 } : item
-      ));
+      setCarrito(carrito.map(item => item.id === producto.id ? { ...item, cantidad: item.cantidad + 1 } : item));
     } else {
       setCarrito([...carrito, { ...producto, cantidad: 1 }]);
     }
   };
 
-  const calcularTotal = () => carrito.reduce((total, item) => total + (item.precio * item.cantidad), 0);
   const limpiarCarrito = () => setCarrito([]);
 
   const eliminarSeleccionado = () => {
-    if (seleccionado !== null) {
-      const item = carrito.find(item => item.id === seleccionado);
-      if (!item) return;
-      if (item.cantidad > 1) {
-        setCarrito(carrito.map(producto =>
-          producto.id === seleccionado ? { ...producto, cantidad: producto.cantidad - 1 } : producto
-        ));
-      } else {
-        setCarrito(carrito.filter(producto => producto.id !== seleccionado));
-        setSeleccionado(null);
-      }
+    if (seleccionado === null) return;
+    const item = carrito.find(item => item.id === seleccionado);
+    if (!item) return;
+    if (item.cantidad > 1) {
+      setCarrito(carrito.map(p => p.id === seleccionado ? { ...p, cantidad: p.cantidad - 1 } : p));
+    } else {
+      setCarrito(carrito.filter(p => p.id !== seleccionado));
+      setSeleccionado(null);
     }
   };
 
   const cobrar = () => {
-    if (!cajaAbierta) {
-      alert('Debe abrir la caja antes de cobrar.');
-      setMostrarCaja(true);
-      return;
-    }
-    if (carrito.length === 0) {
-      alert('El carrito está vacío');
-      return;
-    }
+    if (!cajaAbierta) { alert('Debe abrir la caja antes de cobrar.'); setMostrarCaja(true); return; }
+    if (carrito.length === 0) { alert('El carrito está vacío'); return; }
     setMostrarModalPago(true);
   };
 
+  // ── Pago ───────────────────────────────────────────────────────────────────
   const agregarMetodoPago = (metodo) => {
     const totalVenta = carrito.reduce((sum, item) => sum + (item.precio * item.cantidad), 0);
     if (pagosSeleccionados.length === 0) {
@@ -922,9 +673,7 @@ function AppInner() {
     }
   };
 
-  const quitarMetodoPago = (index) => {
-    setPagosSeleccionados(pagosSeleccionados.filter((_, i) => i !== index));
-  };
+  const quitarMetodoPago = (index) => setPagosSeleccionados(pagosSeleccionados.filter((_, i) => i !== index));
 
   const actualizarMontoPago = (index, nuevoMonto) => {
     const actualizado = [...pagosSeleccionados];
@@ -932,1735 +681,174 @@ function AppInner() {
     setPagosSeleccionados(actualizado);
   };
 
-    const confirmarVenta = async () => {
-  const totalVenta = carrito.reduce((sum, item) => sum + (item.precio * item.cantidad), 0);
-  const totalPagos = pagosSeleccionados.reduce((sum, p) => sum + p.monto, 0);
-  if (Math.abs(totalPagos - totalVenta) > 0.01) {
-    alert(`Error: El total de pagos ($${totalPagos.toLocaleString()}) no coincide con el total de la venta ($${totalVenta.toLocaleString()})`);
-    return;
-  }
-
-  const ventaBase = {
-    fecha: new Date().toISOString(),
-    items: carrito.map(i => ({ id: i.id, nombre: i.nombre, cantidad: i.cantidad, precio: i.precio })),
-    total: totalVenta,
-    pagos: pagosSeleccionados.map(p => ({ metodo: p.metodo, monto: p.monto }))
-  };
-
-  // Guardar en la BD primero
-  console.log('Guardando venta en BD...');
-  const ventaId = await apiGuardarVenta(ventaBase);
-
-  if (!ventaId) {
-    alert('Error: No se pudo guardar la venta en la base de datos. Intente de nuevo.');
-    return;
-  }
-
-  const nuevaVenta = { ...ventaBase, id: ventaId };
-
-  // Solo si se guardó exitosamente, actualizar el estado local
-  const ventasActualizadas = [...ventasDelDia, nuevaVenta];
-  setVentasDelDia(ventasActualizadas);
-
-  console.log('✅ Venta guardada localmente y en BD:', nuevaVenta);
-
-  // Guardar la venta confirmada y mostrar el resumen
-  setVentaConfirmada(nuevaVenta);
-  setMostrarModalPago(false);
-};
-
-  const cancelarVenta = () => {
-    setMostrarModalPago(false);
-    setPagosSeleccionados([]);
-  };
-
-  const cerrarResumenVenta = () => {
-    setVentaConfirmada(null);
-    setPagosSeleccionados([]);
-    limpiarCarrito();
-    setSeleccionado(null);
-    setCategoriaActiva(null);
-  };
-
-  const buildVentaDesdeCarrito = () => {
+  const confirmarVenta = async () => {
     const totalVenta = carrito.reduce((sum, item) => sum + (item.precio * item.cantidad), 0);
-    return {
-      id: Date.now(),
+    const totalPagos = pagosSeleccionados.reduce((sum, p) => sum + p.monto, 0);
+    if (Math.abs(totalPagos - totalVenta) > 0.01) { alert(`El total de pagos no coincide con el total de la venta`); return; }
+    const ventaBase = {
       fecha: new Date().toISOString(),
       items: carrito.map(i => ({ id: i.id, nombre: i.nombre, cantidad: i.cantidad, precio: i.precio })),
       total: totalVenta,
       pagos: pagosSeleccionados.map(p => ({ metodo: p.metodo, monto: p.monto }))
     };
+    const ventaId = await apiGuardarVenta(ventaBase);
+    if (!ventaId) { alert('Error: No se pudo guardar la venta. Intente de nuevo.'); return; }
+    const nuevaVenta = { ...ventaBase, id: ventaId };
+    setVentasDelDia([...ventasDelDia, nuevaVenta]);
+    setVentaConfirmada(nuevaVenta);
+    setMostrarModalPago(false);
   };
 
-  const generarHTMLTicket = (venta) => {
-    const nombreTienda = 'Grido Laspiur';
-    const fecha = new Date(venta.fecha).toLocaleString('es-AR');
-    const itemsHtml = (venta.items || []).map(it => `
-      <tr>
-        <td style="padding:4px 8px">${it.cantidad} x ${it.nombre}</td>
-        <td style="padding:4px 8px; text-align:right">$${(it.precio * it.cantidad).toLocaleString()}</td>
-      </tr>
-    `).join('');
-    const pagosHtml = (venta.pagos || []).map(p => `<div style="display:flex;justify-content:space-between;margin-top:6px"><div>${p.metodo}</div><div>$${p.monto.toLocaleString()}</div></div>`).join('');
-    const totalHtml = `<div style="display:flex;justify-content:space-between;font-weight:700;margin-top:8px"><div>TOTAL</div><div>$${venta.total.toLocaleString()}</div></div>`;
-    const descripcion = venta.descripcion ? `<div style="margin-top:6px">${venta.descripcion}</div>` : '';
+  const cancelarVenta = () => { setMostrarModalPago(false); setPagosSeleccionados([]); };
 
-    return `
-      <html>
-        <head>
-          <meta charset="utf-8" />
-          <title>Ticket</title>
-          <style>
-            body { font-family: Arial, Helvetica, sans-serif; font-size: 12px; padding: 10px; }
-            .center { text-align: center; }
-            .items { width: 100%; border-collapse: collapse; margin-top: 8px; }
-            @media print { body { margin:0 } }
-          </style>
-        </head>
-        <body>
-          <div class="center">
-            <h2 style="margin:6px 0">${nombreTienda}</h2>
-            <div>${fecha}</div>
-          </div>
-          <hr />
-          <table class="items">
-            ${itemsHtml}
-          </table>
-          ${totalHtml}
-          <div style="margin-top:8px">${pagosHtml}</div>
-          ${descripcion}
-          <hr />
-          <div class="center">Gracias por su compra</div>
-        </body>
-      </html>
-    `;
+  const cerrarResumenVenta = () => {
+    setVentaConfirmada(null); setPagosSeleccionados([]); limpiarCarrito(); setSeleccionado(null); setCategoriaActiva(null);
   };
 
-  const printTicket = (venta) => {
-    const html = generarHTMLTicket(venta);
-    const w = window.open('', '_blank', 'width=400,height=600');
-    if (!w) { alert('No se pudo abrir la ventana de impresión. Revisa el bloqueador de ventanas emergentes.'); return; }
-    w.document.open();
-    w.document.write(html);
-    w.document.close();
-    setTimeout(() => { w.print(); /* w.close(); */ }, 300);
-  };
-
-  const filtrarVentasPorPeriodo = () => {
-    const hoy = new Date();
-    if (!ventasDelDia || ventasDelDia.length === 0) return [];
-    if (periodoSeleccionado === 'HOY') {
-      const yyyy = hoy.getFullYear(); const mm = String(hoy.getMonth() + 1).padStart(2, '0'); const dd = String(hoy.getDate()).padStart(2, '0');
-      const fechaStr = `${yyyy}-${mm}-${dd}`;
-      return ventasDelDia.filter(v => fechaLocal(v.fecha) === fechaStr);
-    } else if (periodoSeleccionado === 'SEMANA') {
-      const inicioSemana = new Date(hoy);
-      inicioSemana.setDate(hoy.getDate() - 7);
-      return ventasDelDia.filter(v => {
-        const fv = new Date(v.fecha);
-        return fv >= inicioSemana && fv <= hoy;
-      });
-    } else if (periodoSeleccionado === 'MES') {
-      const mes = hoy.getMonth(); const anio = hoy.getFullYear();
-      return ventasDelDia.filter(v => {
-        const fv = new Date(v.fecha);
-        return fv.getMonth() === mes && fv.getFullYear() === anio;
-      });
-    }
-    return ventasDelDia;
-  };
-  const calcularMetricasMedios = (ventas = ventasDelDia) => {
-  const resumen = {};
-  ventas.forEach(v => {
-    (v.pagos || []).forEach(p => {
-      const metodo = p.metodo || 'OTRO';
-      resumen[metodo] = (resumen[metodo] || 0) + (parseFloat(p.monto) || 0);
-    });
-  });
-  const total = Object.values(resumen).reduce((s, a) => s + a, 0);
-  const lista = Object.keys(resumen).map(m => ({
-    metodo: m,
-    monto: resumen[m],
-    porcentaje: total ? Math.round((resumen[m] * 100) / total) : 0
-  }));
-  // ordenar desc por monto
-  lista.sort((a, b) => b.monto - a.monto);
-  return { resumen, lista, total };
-};
-  const calcularMetricas = () => {
-    const ventas = filtrarVentasPorPeriodo();
-    const totalVentas = ventas.reduce((sum, v) => sum + (parseFloat(v.total) || 0), 0);
-    const cantidadVentas = ventas.length;
-    const cantidadProductos = ventas.reduce((sum, v) => {
-      const items = v.items || [];
-      return sum + items.reduce((s, it) => s + (parseInt(it.cantidad) || 0), 0);
-    }, 0);
-    const ventaPromedio = cantidadVentas > 0 ? totalVentas / cantidadVentas : 0;
-    return { totalVentas, cantidadVentas, cantidadProductos, ventaPromedio };
-  };
-
-  const buildResumenNumerico = () => {
-    const m = calcularMetricas();
-    const medios = calcularMetricasMedios();
-    const ventas = m.totalVentas;
-    const retirosHoy = sumarRetiros();
-    const diferencia = ventas - retirosHoy;
-    const topMedio = medios.lista && medios.lista.length > 0 ? `${medios.lista[0].metodo} (${medios.lista[0].porcentaje}%)` : '—';
-    return { ventas, retirosHoy, diferencia, topMedio };
-  };
-
-  const resumenNumerico = buildResumenNumerico();
-
-  const obtenerTop5Productos = () => {
-    const ventas = filtrarVentasPorPeriodo();
-    const agrupado = {};
-    ventas.forEach(v => {
-      const items = v.items || [];
-      items.forEach(it => {
-        const key = it.id || it.nombre || JSON.stringify(it);
-        if (!agrupado[key]) agrupado[key] = { nombre: it.nombre || key, cantidad: 0, total: 0 };
-        agrupado[key].cantidad += parseInt(it.cantidad) || 0;
-        agrupado[key].total += (parseFloat(it.precio) || 0) * (parseInt(it.cantidad) || 0);
-      });
-    });
-    return Object.values(agrupado).sort((a, b) => b.cantidad - a.cantidad).slice(0, 5);
-  };
-
-  // ========== FUNCIONES DE REPORTES POR PERÍODO ==========
-  const generarReporteDiario = () => {
-    const reportePorDia = {};
-    (ventasDelDia || []).forEach(v => {
-      const fecha = fechaLocal(v.fecha);
-      if (!reportePorDia[fecha]) {
-        reportePorDia[fecha] = { fecha, total: 0, cantidad: 0, productos: {} };
-      }
-      reportePorDia[fecha].total += parseFloat(v.total) || 0;
-      const items = v.items || [];
-      items.forEach(it => {
-        const key = it.nombre || `Producto ${it.id}`;
-        if (!reportePorDia[fecha].productos[key]) {
-          reportePorDia[fecha].productos[key] = { nombre: key, cantidad: 0, total: 0 };
-        }
-        reportePorDia[fecha].productos[key].cantidad += parseInt(it.cantidad) || 0;
-        reportePorDia[fecha].productos[key].total += (parseFloat(it.precio) || 0) * (parseInt(it.cantidad) || 0);
-      });
-      reportePorDia[fecha].cantidad += items.length;
-    });
-    return Object.values(reportePorDia).sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
-  };
-
-  const generarReporteSemanal = () => {
-    const reportePorSemana = {};
-    const hoy = new Date();
-    (ventasDelDia || []).forEach(v => {
-      const fv = new Date(v.fecha);
-      const diff = (hoy - fv) / (1000 * 60 * 60 * 24);
-      const semana = Math.floor(diff / 7);
-      const clave = `Semana ${semana}`;
-      if (!reportePorSemana[clave]) {
-        reportePorSemana[clave] = { semana: clave, total: 0, cantidadProductos: 0, productos: {} };
-      }
-      reportePorSemana[clave].total += parseFloat(v.total) || 0;
-      const items = v.items || [];
-      items.forEach(it => {
-        const key = it.nombre || `Producto ${it.id}`;
-        if (!reportePorSemana[clave].productos[key]) {
-          reportePorSemana[clave].productos[key] = { nombre: key, cantidad: 0, total: 0 };
-        }
-        reportePorSemana[clave].productos[key].cantidad += parseInt(it.cantidad) || 0;
-        reportePorSemana[clave].productos[key].total += (parseFloat(it.precio) || 0) * (parseInt(it.cantidad) || 0);
-      });
-      reportePorSemana[clave].cantidadProductos += items.reduce((s, it) => s + (parseInt(it.cantidad) || 0), 0);
-    });
-    return Object.values(reportePorSemana);
-  };
-
-  const generarReporteMensual = () => {
-    const reportePorMes = {};
-    (ventasDelDia || []).forEach(v => {
-      const fv = new Date(v.fecha);
-      const mes = fv.getMonth() + 1;
-      const anio = fv.getFullYear();
-      const clave = `${anio}-${String(mes).padStart(2, '0')}`;
-      if (!reportePorMes[clave]) {
-        reportePorMes[clave] = { mes: clave, total: 0, cantidadProductos: 0, productos: {} };
-      }
-      reportePorMes[clave].total += parseFloat(v.total) || 0;
-      const items = v.items || [];
-      items.forEach(it => {
-        const key = it.nombre || `Producto ${it.id}`;
-        if (!reportePorMes[clave].productos[key]) {
-          reportePorMes[clave].productos[key] = { nombre: key, cantidad: 0, total: 0 };
-        }
-        reportePorMes[clave].productos[key].cantidad += parseInt(it.cantidad) || 0;
-        reportePorMes[clave].productos[key].total += (parseFloat(it.precio) || 0) * (parseInt(it.cantidad) || 0);
-      });
-      reportePorMes[clave].cantidadProductos += items.reduce((s, it) => s + (parseInt(it.cantidad) || 0), 0);
-    });
-    return Object.values(reportePorMes).sort((a, b) => b.mes.localeCompare(a.mes));
-  };
-
-  // Función para limpiar/resetear datos del dashboard
-  const limpiarDatos = () => {
-    if (window.confirm('¿Estás seguro de que quieres limpiar todos los datos del dashboard? Esta acción no se puede deshacer.')) {
-      setVentasDelDia([]);
-      setDiaSeleccionado(null);
-      alert('Datos limpios. El dashboard ha sido reiniciado.');
-    }
-  };
-
-  const totalCarrito = carrito.reduce((total, item) => total + (item.precio * item.cantidad), 0);
-
-  const confirmarInicioCaja = async () => {
-    const total = denomInicioRef.current?.getTotal() ?? 0;
-    if (total === 0) { alert('Debe ingresar al menos una denominación'); return; }
-    const v = denomInicioRef.current.getValues();
-    const denominaciones = { billete20000: v.d20000, billete10000: v.d10000, billete2000: v.d2000, billete1000: v.d1000, billete500: v.d500, billete200: v.d200, billete100: v.d100, moneda50: v.d50, moneda20: v.d20, moneda10: v.d10 };
-    const datosCaja = { fecha: new Date().toISOString(), montoInicial: total, denominaciones, iniciadoPor: user?.username ?? null };
-    const tokenActual = localStorage.getItem('auth_token');
-    try {
-      const res = await fetch(`${API_URL}/cajas/abrir`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${tokenActual}` },
-        body: JSON.stringify({ usuario_id: user.id, monto_inicial: total, denominaciones_inicio: denominaciones })
-      });
-      const data = await res.json();
-      if (!res.ok) { alert(data.error || 'Error al abrir caja'); return; }
-      setCajaId(data.caja.id);
-      localStorage.setItem('cajaId', String(data.caja.id));
-    } catch (e) {
-      alert('Error de conexión al abrir caja'); return;
-    }
-    setInicioCaja(datosCaja);
-    setCajaAbierta(true);
-    setMostrarCaja(false);
-    localStorage.setItem('cajaAbierta', 'true');
-    localStorage.setItem('inicioCaja', JSON.stringify(datosCaja));
-    alert(`Caja abierta exitosamente\nMonto inicial: $${total.toLocaleString()}`);
-  };
-
-  const calcularResumenCaja = () => {
-    const montoInicial = inicioCaja ? inicioCaja.montoInicial : 0;
-    const hoy = new Date();
-    const fechaHoy = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`;
-    const fechaDesdeApertura = inicioCaja?.fecha ? fechaLocal(inicioCaja.fecha) : fechaHoy;
-    const ventasHoy = ventasDelDia.filter(v => fechaLocal(v.fecha) >= fechaDesdeApertura);
-    // Sumar SOLO el efectivo de hoy, no transferencias ni débitos
-    const totalVentas = ventasHoy.reduce((sum, v) => {
-      const efectivoDelVenta = v.pagos?.reduce((pSum, p) => {
-        return p.metodo === 'EFECTIVO' ? pSum + (parseFloat(p.monto) || 0) : pSum;
-      }, 0) || 0;
-      return sum + efectivoDelVenta;
-    }, 0);
-    const retirosSum = sumarRetiros();
-    const gastosSum = sumarGastos();
-    const totalEsperado = montoInicial + totalVentas - retirosSum - gastosSum;
-    const totalReal = calcularTotalCierre();
-    const diferencia = totalReal - totalEsperado;
-
-    return { montoInicial, totalVentas, retiros: retirosSum, gastos: gastosSum, totalEsperado, totalReal, diferencia };
-  };
-
-  const imprimirReporteCierre = (resumen, ventasHoy, retirosHoy) => {
-    const ahora = new Date();
-    const fmt = (d) => `${d.getDate().toString().padStart(2,'0')}/${(d.getMonth()+1).toString().padStart(2,'0')}/${d.getFullYear()} ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;
-
-    // Totales por medio de pago
-    const porMetodo = {};
-    ventasHoy.forEach(v => {
-      (v.pagos || []).forEach(p => {
-        porMetodo[p.metodo] = (porMetodo[p.metodo] || 0) + parseFloat(p.monto || 0);
-      });
-    });
-    const totalGeneral = Object.values(porMetodo).reduce((s, v) => s + v, 0);
-
-    const difColor = resumen.diferencia >= 0 ? '#16a34a' : '#dc2626';
-    const difText = resumen.diferencia >= 0
-      ? `+$${resumen.diferencia.toLocaleString()}`
-      : `-$${Math.abs(resumen.diferencia).toLocaleString()}`;
-
-    const fila = (label, valor, bold = false, color = '') =>
-      `<tr style="${bold ? 'font-weight:bold;border-top:1px solid #111;' : ''}">
-        <td style="padding:5px 4px;">${label}</td>
-        <td style="text-align:right;padding:5px 4px;${color ? `color:${color};font-weight:bold;` : ''}">$${valor}</td>
-      </tr>`;
-
-    const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
-    <title>Cierre de Caja</title>
-    <style>
-      * { margin: 0; padding: 0; box-sizing: border-box; }
-      body { font-family: 'Courier New', monospace; font-size: 13px; color: #111; padding: 16px; max-width: 320px; margin: 0 auto; }
-      h1 { font-size: 16px; text-align: center; margin-bottom: 2px; }
-      .sub { text-align: center; font-size: 11px; color: #555; margin-bottom: 12px; }
-      .linea { border-top: 1px dashed #999; margin: 10px 0; }
-      table { width: 100%; border-collapse: collapse; }
-      td { font-size: 13px; }
-      .titulo-sec { font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; color: #555; margin: 10px 0 4px 0; }
-      @media print { body { padding: 4px; } }
-    </style></head><body>
-    <h1>GRIDO LASPIUR</h1>
-    <p class="sub">CIERRE DE CAJA</p>
-    <p class="sub">${fmt(ahora)}</p>
-    ${inicioCaja ? `<p class="sub">Apertura: ${fmt(new Date(inicioCaja.fecha))}</p>` : ''}
-
-    <div class="linea"></div>
-    <p class="titulo-sec">Ventas por medio de pago</p>
-    <table>
-      ${Object.entries(porMetodo).map(([m, v]) => fila(m, v.toLocaleString())).join('')}
-      ${fila('TOTAL VENTAS', totalGeneral.toLocaleString(), true)}
-    </table>
-
-    <div class="linea"></div>
-    <p class="titulo-sec">Caja efectivo</p>
-    <table>
-      ${fila('Monto inicial', resumen.montoInicial.toLocaleString())}
-      ${fila('Ventas efectivo', (porMetodo['EFECTIVO'] || 0).toLocaleString())}
-      ${resumen.retiros > 0 ? fila('Retiros', resumen.retiros.toLocaleString()) : ''}
-      ${fila('Efectivo esperado', resumen.totalEsperado.toLocaleString(), true)}
-      ${fila('Efectivo contado', resumen.totalReal.toLocaleString())}
-      ${fila('Diferencia', difText.replace('$',''), true, difColor)}
-    </table>
-
-    ${retirosHoy.length > 0 ? `
-    <div class="linea"></div>
-    <p class="titulo-sec">Retiros (${retirosHoy.length})</p>
-    <table>
-      ${retirosHoy.map(r => fila(r.descripcion || 'Retiro', parseFloat(r.monto).toLocaleString())).join('')}
-    </table>` : ''}
-
-    <div class="linea"></div>
-    <p class="sub">Sistema Grido Laspiur</p>
-    <script>window.onload = () => window.print();</script>
-    </body></html>`;
-
-    const ventana = window.open('', '_blank', 'width=380,height=600');
-    ventana.document.write(html);
-    ventana.document.close();
-  };
-
-  const confirmarCierreCaja = async () => {
-    const resumen = calcularResumenCaja();
-    const tokenActual = localStorage.getItem('auth_token');
-    const idCaja = cajaId || localStorage.getItem('cajaId');
-
-    // Ventas desde la apertura de caja para el reporte
-    const hoy = new Date();
-    const fechaHoy = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`;
-    const fechaDesdeApertura = inicioCaja?.fecha ? fechaLocal(inicioCaja.fecha) : fechaHoy;
-    const ventasHoy = ventasDelDia.filter(v => fechaLocal(v.fecha) >= fechaDesdeApertura && v.estado !== 'cancelada');
-
-    if (idCaja) {
-      try {
-        const denomCierre = denomCierreRef.current?.getValues() || {};
-        await fetch(`${API_URL}/cajas/${idCaja}/cerrar`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${tokenActual}` },
-          body: JSON.stringify({
-            monto_cierre: resumen.totalReal,
-            denominaciones_cierre: denomCierre,
-            diferencia: resumen.diferencia,
-            total_ventas: resumen.totalVentas,
-            total_retiros: resumen.retiros,
-            total_gastos: resumen.gastos
-          })
-        });
-      } catch (e) {
-        console.error('Error al cerrar caja en BD:', e);
-      }
-    }
-
-    // Imprimir reporte antes de limpiar los datos
-    imprimirReporteCierre(resumen, ventasHoy, retiros);
-
-    setCajaAbierta(false);
-    setMostrarCaja(false);
-    setCajaId(null);
-    setCierreKey(k => k + 1);
-    setCierreTotalContado(0);
-    setVentasDelDia([]);
-    setInicioCaja(null);
-    setRetiros([]);
-    setGastos([]);
-    localStorage.removeItem('cajaAbierta');
-    localStorage.removeItem('inicioCaja');
-    localStorage.removeItem('cajaId');
-    localStorage.removeItem('retiros');
-    localStorage.removeItem('gastos');
-    localStorage.removeItem('cierre-denominaciones');
-  };
-
+  // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="App">
+      {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center', maxWidth: '1400px', margin: '0 auto 30px', gap: '12px' }}>
         <h1 style={{ margin: 0, marginRight: '8px', fontSize: '22px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
-  <img src="/favicon-32x32.png" alt="" style={{ width: '36px', height: '36px', borderRadius: '50%', border: '2px solid white', overflow: 'hidden' }} />
-  Grido Laspiur
-</h1>
-          <div className="header-actions" style={{ display: 'flex', gap: 0, alignItems: 'center', marginLeft: 'auto' }}>
-            <nav className="main-nav" style={{ display: 'flex', gap: '6px' }}>
-              <button className={`nav-btn ${mostrarDashboard ? 'active' : ''}`} onClick={() => { setMostrarDashboard(true); setMostrarCaja(false); setMostrarRetiros(false); setMostrarGestionProductos(false); setMostrarGestionUsuarios(false); setMostrarHistorialCajas(false); setMostrarMiTurno(false); setMostrarHistorialTurnos(false); }}>Dashboard</button>
-              <button className={`nav-btn ${mostrarCaja ? 'active' : ''}`} onClick={() => { setMostrarCaja(true); setMostrarDashboard(false); setMostrarRetiros(false); setMostrarGestionProductos(false); setMostrarGestionUsuarios(false); setMostrarHistorialCajas(false); setMostrarMiTurno(false); setMostrarHistorialTurnos(false); }}>Caja</button>
-              <button className={`nav-btn ${mostrarRetiros ? 'active' : ''}`} onClick={() => { setMostrarRetiros(true); setMostrarCaja(false); setMostrarDashboard(false); setMostrarGestionProductos(false); setMostrarGestionUsuarios(false); setMostrarHistorialCajas(false); setMostrarMiTurno(false); setMostrarHistorialTurnos(false); }}>Retiros</button>
-              <button className={`nav-btn`} onClick={() => { setMostrarDashboard(false); setMostrarCaja(false); setMostrarRetiros(false); setMostrarGestionProductos(false); setMostrarGestionUsuarios(false); setMostrarHistorialCajas(false); setMostrarMiTurno(false); setMostrarHistorialTurnos(false); setCategoriaActiva(null); }}>Productos</button>
-              <button className={`nav-btn ${mostrarMiTurno ? 'active' : ''}`} onClick={() => { setMostrarMiTurno(true); setMostrarDashboard(false); setMostrarCaja(false); setMostrarRetiros(false); setMostrarGestionProductos(false); setMostrarHistorialCajas(false); setMostrarHistorialTurnos(false); cargarTurnoActivo(); }}>Mi Turno</button>
-              {isAdmin && <button className={`nav-btn ${mostrarGestionProductos ? 'active' : ''}`} onClick={() => { setMostrarGestionProductos(true); setMostrarGestionUsuarios(false); setMostrarHistorialCajas(false); setMostrarMiTurno(false); setMostrarHistorialTurnos(false); setMostrarDashboard(false); setMostrarCaja(false); setMostrarRetiros(false); cargarTodosProductos(); }}>Gestión</button>}
-              {isAdmin && <button className={`nav-btn ${mostrarGestionUsuarios ? 'active' : ''}`} onClick={() => { setMostrarGestionUsuarios(true); setMostrarGestionProductos(false); setMostrarHistorialCajas(false); setMostrarMiTurno(false); setMostrarHistorialTurnos(false); setMostrarDashboard(false); setMostrarCaja(false); setMostrarRetiros(false); cargarUsuarios(); }}>Usuarios</button>}
-              {isAdmin && <button className={`nav-btn ${mostrarHistorialCajas ? 'active' : ''}`} onClick={() => { setMostrarHistorialCajas(true); setMostrarGestionProductos(false); setMostrarMiTurno(false); setMostrarHistorialTurnos(false); setMostrarDashboard(false); setMostrarCaja(false); setMostrarRetiros(false); cargarHistorialCajas(); }}>Cajas</button>}
-              {isAdmin && <button className={`nav-btn ${mostrarHistorialTurnos ? 'active' : ''}`} onClick={() => { setMostrarHistorialTurnos(true); setMostrarHistorialCajas(false); setMostrarGestionProductos(false); setMostrarMiTurno(false); setMostrarDashboard(false); setMostrarCaja(false); setMostrarRetiros(false); setTurnoDetalle(null); cargarHistorialTurnos(); }}>Turnos</button>}
-            </nav>
-            <div className="header-right" style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-              <button className={`btn-open-caja ${cajaAbierta ? 'open' : ''}`} onClick={() => { setMostrarDashboard(false); setMostrarCaja(true); }}>{cajaAbierta ? '💰 Caja Abierta' : '💰 Abrir Caja'}</button>
-
-              {user && (
-                <>
-                  <div className="usuario-info">{user.nombre}</div>
-                  <button className="btn-logout" onClick={() => {
-                    // La caja es del local, no del usuario.
-                    // Se puede cambiar de sesión sin cerrar la caja.
-                    localStorage.removeItem('retiros');
-                    localStorage.removeItem('gastos');
-                    cerrarTurno();
-                    logout();
-                  }}>Cerrar sesión</button>
-                </>
-              )}
-            </div>
+          <img src="/favicon-32x32.png" alt="" style={{ width: '36px', height: '36px', borderRadius: '50%', border: '2px solid white', overflow: 'hidden' }} />
+          Grido Laspiur
+        </h1>
+        <div className="header-actions" style={{ display: 'flex', gap: 0, alignItems: 'center', marginLeft: 'auto' }}>
+          <nav className="main-nav" style={{ display: 'flex', gap: '6px' }}>
+            <button className={`nav-btn ${mostrarDashboard ? 'active' : ''}`} onClick={() => { navClear(); setMostrarDashboard(true); }}>Dashboard</button>
+            <button className={`nav-btn ${mostrarCaja ? 'active' : ''}`} onClick={() => { navClear(); setMostrarCaja(true); }}>Caja</button>
+            <button className={`nav-btn ${mostrarRetiros ? 'active' : ''}`} onClick={() => { navClear(); setMostrarRetiros(true); }}>Retiros</button>
+            <button className="nav-btn" onClick={() => { navClear(); setCategoriaActiva(null); }}>Productos</button>
+            <button className={`nav-btn ${mostrarMiTurno ? 'active' : ''}`} onClick={() => { navClear(); setMostrarMiTurno(true); cargarTurnoActivo(); }}>Mi Turno</button>
+            {isAdmin && <button className={`nav-btn ${mostrarGestionProductos ? 'active' : ''}`} onClick={() => { navClear(); setMostrarGestionProductos(true); cargarTodosProductos(); }}>Gestión</button>}
+            {isAdmin && <button className={`nav-btn ${mostrarGestionUsuarios ? 'active' : ''}`} onClick={() => { navClear(); setMostrarGestionUsuarios(true); cargarUsuarios(); }}>Usuarios</button>}
+            {isAdmin && <button className={`nav-btn ${mostrarHistorialCajas ? 'active' : ''}`} onClick={() => { navClear(); setMostrarHistorialCajas(true); cargarHistorialCajas(); }}>Cajas</button>}
+            {isAdmin && <button className={`nav-btn ${mostrarHistorialTurnos ? 'active' : ''}`} onClick={() => { navClear(); setMostrarHistorialTurnos(true); setTurnoDetalle(null); cargarHistorialTurnos(); }}>Turnos</button>}
+          </nav>
+          <div className="header-right" style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+            <button className={`btn-open-caja ${cajaAbierta ? 'open' : ''}`} onClick={() => { navClear(); setMostrarCaja(true); }}>{cajaAbierta ? '💰 Caja Abierta' : '💰 Abrir Caja'}</button>
+            {user && (
+              <>
+                <div className="usuario-info">{user.nombre}</div>
+                <button className="btn-logout" onClick={() => {
+                  localStorage.removeItem('retiros'); localStorage.removeItem('gastos');
+                  cerrarTurno(); logout();
+                }}>Cerrar sesión</button>
+              </>
+            )}
           </div>
+        </div>
       </div>
 
-
-{mostrarCaja ? (
-        <div className="caja-container">
-          {!cajaAbierta ? (
-            <div className="inicio-caja">
-              <h2>💰 Inicio de Caja</h2>
-              <p className="fecha-caja">📅 {new Date().toLocaleDateString('es-AR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
-              <DenomGrid ref={denomInicioRef} prefix="inicio" gridClass="denominaciones-grid" totalLabel="Total Inicio de Caja" />
-              <div className="botones-caja">
-                <button className="btn-inicio-caja" onClick={confirmarInicioCaja}>✓ Confirmar e Iniciar Caja</button>
-                <button className="btn-cancelar-caja" onClick={() => setMostrarCaja(false)}>Cancelar</button>
-              </div>
-            </div>
-          ) : (
-            <div className="cierre-caja">
-              <h2>💰 Cierre de Caja</h2>
-              <p className="fecha-caja">📅 {new Date().toLocaleDateString('es-AR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
-              <div className="cierre-layout">
-                <div className="cierre-conteo">
-                  <h3>💵 Contar Efectivo en Caja</h3>
-                  <DenomGrid ref={denomCierreRef} key={cierreKey} prefix="cierre" gridClass="denominaciones-grid-cierre" totalLabel="Total Contado" onTotalChange={setCierreTotalContado} storageKey="cierre-denominaciones" />
-                </div>
-                <div className="cierre-resumen">
-                  <h3>📊 Resumen del Día</h3>
-                  <div className="resumen-item"><span>Inicio de Caja:</span><span className="monto">${calcularResumenCaja().montoInicial.toLocaleString()}</span></div>
-                  <div className="resumen-item"><span>Ventas del Día:</span><span className="monto positivo">${calcularResumenCaja().totalVentas.toLocaleString()}</span></div>
-                  {(() => {
-  const hoy = new Date();
-  const fechaHoy = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`;
-  const fechaDesdeApertura = inicioCaja?.fecha ? fechaLocal(inicioCaja.fecha) : fechaHoy;
-  const ventasHoy = ventasDelDia.filter(v => fechaLocal(v.fecha) >= fechaDesdeApertura);
-  const medios = calcularMetricasMedios(ventasHoy);
-  return medios.lista.length > 0 ? (
-    <div className="resumen-medios">
-      <h4>Medios de Pago</h4>
-      {medios.lista.map((m, idx) => (
-        <div key={idx} className="resumen-item">
-          <span>{m.metodo}</span>
-          <span className="monto">${m.monto.toLocaleString()}<span className="porcentaje"> {m.porcentaje}%</span></span>
-        </div>
-      ))}
-    </div>
-  ) : null;
-})()}
-                  <div className="retirar-form">
-                    {isAdmin ? (
-                      <>
-                        <input name="retiro-monto" type="number" min="1" value={nuevoRetiroMonto} onChange={(e) => setNuevoRetiroMonto(e.target.value)} placeholder="Monto retiro" />
-                        <input name="retiro-desc" type="text" value={nuevoRetiroDesc} onChange={(e) => setNuevoRetiroDesc(e.target.value)} placeholder="Concepto (opcional)" />
-                        <button className="btn-retiro" onClick={agregarRetiro}>Registrar Retiro</button>
-                        <button className="export-btn" onClick={exportarRetirosCSV} disabled={retiros.length===0}>Exportar retiros</button>
-                      </>
-                    ) : (
-                      <div className="sin-permiso">No tenés permisos para registrar retiros</div>
-                    )}
-                  </div>
-                  <div className="retirar-form" style={{ marginTop: 10 }}>
-                    <input name="ingreso-monto" type="number" min="0" value={ingresoMonto} onChange={(e) => setIngresoMonto(e.target.value)} placeholder="Monto ingreso" />
-                    <input name="ingreso-desc" type="text" value={ingresoDesc} onChange={(e) => setIngresoDesc(e.target.value)} placeholder="Descripción (opcional)" />
-                    <select name="ingreso-metodo" className="select-metodo" value={ingresoMetodo} onChange={(e) => setIngresoMetodo(e.target.value)}>
-                      <option value="EFECTIVO">EFECTIVO</option>
-                      <option value="TRANSFERENCIA">TRANSFERENCIA</option>
-                      <option value="DÉBITO">DÉBITO</option>
-                    </select>
-                    <button className="btn-retiro" onClick={guardarIngresoExtra}>➕ Registrar Ingreso</button>
-                  </div>
-                  <div className="lista-retiros">
-                    {retiros.length > 0 ? (
-                      <>
-                        {retiros.map((r, idx) => (
-                          <div key={idx} className="resumen-item retiro-item">
-                            <span>{r.descripcion} <small className="retiro-fecha">({new Date(r.fecha).toLocaleTimeString()})</small></span>
-                            <span className="monto negativo">${r.monto.toLocaleString()} {isAdmin && <button className="btn-eliminar-retiro" onClick={() => eliminarRetiro(idx)}>✕</button>}</span>
-                          </div>
-                        ))}
-                        {retiroEditandoIdx !== null && (
-                          <div className="resumen-item retiro-edicion">
-                            <input name="edit-desc" type="text" value={editandoDesc} onChange={(e) => setEditandoDesc(e.target.value)} placeholder="Descripción" />
-                            <input name="edit-monto" type="number" value={editandoMonto} onChange={(e) => setEditandoMonto(e.target.value)} placeholder="Monto" />
-                            <button className="btn-guardar" onClick={() => guardarEdicionRetiro(retiroEditandoIdx)}>✓ Guardar</button>
-                            <button className="btn-cancelar" onClick={cancelarEdicionRetiro}>⏮ Cancelar</button>
-                          </div>
-                        )}
-                        <div className="resumen-item"><span>Total Retiros:</span><span className="monto negativo">${calcularResumenCaja().retiros.toLocaleString()}</span></div>
-                      </>
-                    ) : (
-                      <div className="resumen-item"><span>Retiros:</span><span className="monto negativo">$0</span></div>
-                    )}
-                  </div>
-                  
-                  <div className="lista-gastos">
-                    <h4 style={{ margin: '0 0 8px 0' }}>💸 Gastos del Día</h4>
-                    <div className="retirar-form" style={{ marginBottom: '8px' }}>
-                      <input name="gasto-monto" type="number" min="0" value={nuevoGastoMonto} onChange={(e) => setNuevoGastoMonto(e.target.value)} placeholder="Monto gasto" />
-                      <input name="gasto-desc" type="text" value={nuevoGastoDesc} onChange={(e) => setNuevoGastoDesc(e.target.value)} placeholder="Descripción (opcional)" />
-                      <button className="btn-retiro" onClick={agregarGasto}>➕ Agregar Gasto</button>
-                    </div>
-                    {gastos.length > 0 ? (
-                      <>
-                        {gastos.map((g, idx) => (
-                          <div key={idx} className="resumen-item retiro-item">
-                            <span>{g.descripcion} <small className="retiro-fecha">({new Date(g.fecha).toLocaleTimeString()})</small></span>
-                            <span className="monto negativo">${g.monto.toLocaleString()} <button className="btn-eliminar-retiro" onClick={() => eliminarGasto(idx)}>✕</button></span>
-                          </div>
-                        ))}
-                        <div className="resumen-item"><span>Total Gastos:</span><span className="monto negativo">${calcularResumenCaja().gastos.toLocaleString()}</span></div>
-                      </>
-                    ) : (
-                      <div className="resumen-item"><span>Gastos:</span><span className="monto negativo">$0</span></div>
-                    )}
-                  </div>
-                  <div className="resumen-divider"></div>
-                  <div className="resumen-item destacado"><span>Total Esperado:</span><span className="monto">${calcularResumenCaja().totalEsperado.toLocaleString()}</span></div>
-                  <div className="resumen-item destacado"><span>Plata en Caja:</span><span className="monto">${calcularResumenCaja().totalReal.toLocaleString()}</span></div>
-                  <div className="resumen-divider"></div>
-                  <div className={`resumen-item final ${calcularResumenCaja().diferencia === 0 ? 'correcto' : calcularResumenCaja().diferencia > 0 ? 'sobrante' : 'faltante'}`}><span>Diferencia:</span><span className="monto">${calcularResumenCaja().diferencia.toLocaleString()}</span></div>
-                </div>
-              </div>
-              <div className="botones-caja">
-                <button className="btn-confirmar-caja" onClick={confirmarCierreCaja}>✓ Confirmar Cierre de Caja</button>
-                <button className="btn-cancelar-caja" onClick={() => setMostrarCaja(false)}>Cancelar</button>
-              </div>
-            </div>
-          )}
-        </div>
+      {/* Vistas */}
+      {mostrarCaja ? (
+        <CajaView
+          cajaAbierta={cajaAbierta} inicioCaja={inicioCaja} isAdmin={isAdmin}
+          denomInicioRef={denomInicioRef} denomCierreRef={denomCierreRef}
+          cierreKey={cierreKey} setCierreTotalContado={setCierreTotalContado} cierreTotalContado={cierreTotalContado}
+          nuevoRetiroMonto={nuevoRetiroMonto} setNuevoRetiroMonto={setNuevoRetiroMonto}
+          nuevoRetiroDesc={nuevoRetiroDesc} setNuevoRetiroDesc={setNuevoRetiroDesc}
+          ingresoMonto={ingresoMonto} setIngresoMonto={setIngresoMonto}
+          ingresoDesc={ingresoDesc} setIngresoDesc={setIngresoDesc}
+          ingresoMetodo={ingresoMetodo} setIngresoMetodo={setIngresoMetodo}
+          nuevoGastoMonto={nuevoGastoMonto} setNuevoGastoMonto={setNuevoGastoMonto}
+          nuevoGastoDesc={nuevoGastoDesc} setNuevoGastoDesc={setNuevoGastoDesc}
+          retiros={retiros} gastos={gastos} retiroEditandoIdx={retiroEditandoIdx}
+          editandoMonto={editandoMonto} setEditandoMonto={setEditandoMonto}
+          editandoDesc={editandoDesc} setEditandoDesc={setEditandoDesc}
+          ventasDelDia={ventasDelDia}
+          agregarRetiro={agregarRetiro} eliminarRetiro={eliminarRetiro}
+          iniciarEdicionRetiro={iniciarEdicionRetiro} guardarEdicionRetiro={guardarEdicionRetiro}
+          cancelarEdicionRetiro={cancelarEdicionRetiro}
+          guardarIngresoExtra={guardarIngresoExtra}
+          agregarGasto={agregarGasto} eliminarGasto={eliminarGasto}
+          exportarRetirosCSV={exportarRetirosCSV}
+          confirmarInicioCaja={confirmarInicioCaja} confirmarCierreCaja={confirmarCierreCaja}
+          setMostrarCaja={setMostrarCaja}
+        />
       ) : mostrarRetiros ? (
-        <div className="retiros-container">
-          <h2>📋 Registro de Retiros</h2>
-          <div className="retiros-content">
-            <div className="retiros-formulario">
-              <h3>Registrar Nuevo Retiro</h3>
-              {isAdmin ? (
-                <div className="retirar-form">
-                  <input name="retiro-monto" type="number" min="1" value={nuevoRetiroMonto} onChange={(e) => setNuevoRetiroMonto(e.target.value)} placeholder="Monto del retiro" />
-                  <input name="retiro-desc" type="text" value={nuevoRetiroDesc} onChange={(e) => setNuevoRetiroDesc(e.target.value)} placeholder="Concepto o descripción (opcional)" />
-                  <button className="btn-retiro" onClick={agregarRetiro}>✓ Registrar Retiro</button>
-                  <button className="export-btn" onClick={exportarRetirosCSV} disabled={retiros.length===0}>📥 Exportar a CSV</button>
-                </div>
-              ) : (
-                <div className="sin-permiso">⚠️ No tenés permisos para registrar retiros</div>
-              )}
-            </div>
-            <div className="retiros-lista">
-              <h3>Historial de Retiros</h3>
-              {retiros.length > 0 ? (
-                <div className="lista-retiros-completa">
-                  {retiros.map((r, idx) => (
-                    <div key={idx} className={`retiro-item-full ${retiroEditandoIdx === idx ? 'editando' : ''}`}>
-                      {retiroEditandoIdx === idx ? (
-                        <div className="retiro-edicion-form">
-                          <input name="edit-desc" type="text" value={editandoDesc} onChange={(e) => setEditandoDesc(e.target.value)} placeholder="Descripción" />
-                          <input name="edit-monto" type="number" value={editandoMonto} onChange={(e) => setEditandoMonto(e.target.value)} placeholder="Monto" />
-                          <button className="btn-guardar" onClick={() => guardarEdicionRetiro(idx)}>✓ Guardar</button>
-                          <button className="btn-cancelar" onClick={cancelarEdicionRetiro}>⏮ Cancelar</button>
-                        </div>
-                      ) : (
-                        <>
-                          <div className="retiro-info">
-                            <span className="retiro-desc">{r.descripcion}</span>
-                            <span className="retiro-fecha">{new Date(r.fecha).toLocaleString('es-AR')}</span>
-                            {r.usuario && <span className="retiro-usuario">Por: {r.usuario}</span>}
-                          </div>
-                          <div className="retiro-monto-container">
-                            <span className="retiro-monto">${r.monto.toLocaleString()}</span>
-                            {isAdmin && <>
-                              <button className="btn-editar-retiro" onClick={() => iniciarEdicionRetiro(idx)}>✏️</button>
-                              <button className="btn-eliminar-retiro" onClick={() => eliminarRetiro(idx)}>✕</button>
-                            </>}
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  ))}
-                  <div className="retiro-total">
-                    <span>Total Retiros:</span>
-                    <span className="total-monto">${sumarRetiros().toLocaleString()}</span>
-                  </div>
-                </div>
-              ) : (
-                <div className="retiros-vacio">No hay retiros registrados</div>
-              )}
-            </div>
-          </div>
-        </div>
+        <RetirosView
+          retiros={retiros}
+          nuevoRetiroMonto={nuevoRetiroMonto} setNuevoRetiroMonto={setNuevoRetiroMonto}
+          nuevoRetiroDesc={nuevoRetiroDesc} setNuevoRetiroDesc={setNuevoRetiroDesc}
+          retiroEditandoIdx={retiroEditandoIdx}
+          editandoMonto={editandoMonto} setEditandoMonto={setEditandoMonto}
+          editandoDesc={editandoDesc} setEditandoDesc={setEditandoDesc}
+          isAdmin={isAdmin}
+          agregarRetiro={agregarRetiro} eliminarRetiro={eliminarRetiro}
+          iniciarEdicionRetiro={iniciarEdicionRetiro} guardarEdicionRetiro={guardarEdicionRetiro}
+          cancelarEdicionRetiro={cancelarEdicionRetiro}
+          exportarRetirosCSV={exportarRetirosCSV}
+        />
       ) : mostrarGestionUsuarios && isAdmin ? (
-        <div style={{ padding: '16px', maxWidth: '700px', margin: '0 auto' }}>
-          <h2 style={{ marginBottom: '16px' }}>👥 Gestión de Usuarios</h2>
-
-          {/* Formulario nuevo usuario */}
-          <div style={{ background: '#f8f9fa', border: '1px solid #ddd', borderRadius: '8px', padding: '16px', marginBottom: '24px' }}>
-            <h3 style={{ margin: '0 0 12px', fontSize: '14px' }}>Crear nuevo usuario</h3>
-            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '8px' }}>
-              <input value={nuevoUsuario.nombre} onChange={e => setNuevoUsuario(u => ({ ...u, nombre: e.target.value }))} placeholder="Nombre completo" style={{ flex: 2, padding: '7px 10px', border: '1px solid #ccc', borderRadius: '6px', fontSize: '13px', minWidth: '130px' }} />
-              <input value={nuevoUsuario.email} onChange={e => setNuevoUsuario(u => ({ ...u, email: e.target.value }))} placeholder="Nombre de usuario (para login)" style={{ flex: 2, padding: '7px 10px', border: '1px solid #ccc', borderRadius: '6px', fontSize: '13px', minWidth: '150px' }} />
-            </div>
-            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-              <input value={nuevoUsuario.password} onChange={e => setNuevoUsuario(u => ({ ...u, password: e.target.value }))} placeholder="Contraseña" style={{ flex: 2, padding: '7px 10px', border: '1px solid #ccc', borderRadius: '6px', fontSize: '13px', minWidth: '130px' }} />
-              <button onClick={() => setNuevoUsuario(u => ({ ...u, password: generarPasswordAleatoria() }))} style={{ padding: '7px 10px', background: '#e2e8f0', border: '1px solid #cbd5e0', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', whiteSpace: 'nowrap' }}>🎲 Generar</button>
-              <select value={nuevoUsuario.rol} onChange={e => setNuevoUsuario(u => ({ ...u, rol: e.target.value }))} style={{ padding: '7px 10px', border: '1px solid #ccc', borderRadius: '6px', fontSize: '13px' }}>
-                <option value="vendedor">Vendedor</option>
-                <option value="admin">Admin</option>
-              </select>
-              <button onClick={crearUsuario} style={{ padding: '7px 14px', background: '#48bb78', color: 'white', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>+ Crear</button>
-            </div>
-          </div>
-
-          {/* Tabla de usuarios */}
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-            <thead>
-              <tr style={{ background: '#f1f5f9', borderBottom: '2px solid #e2e8f0' }}>
-                <th style={{ padding: '10px 8px', textAlign: 'left', color: '#374151' }}>Nombre</th>
-                <th style={{ padding: '10px 8px', textAlign: 'left', color: '#374151' }}>Usuario (login)</th>
-                <th style={{ padding: '10px 8px', textAlign: 'left', color: '#374151' }}>Rol</th>
-                <th style={{ padding: '10px 8px', textAlign: 'left', color: '#374151' }}>Contraseña</th>
-                <th style={{ padding: '10px 8px', textAlign: 'center', color: '#374151' }}>Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {usuarios.map((u, idx) => (
-                <tr key={u.id} style={{ borderBottom: '1px solid #e2e8f0', background: idx % 2 === 0 ? '#fff' : '#fafafa' }}>
-                  {usuarioEditando?.id === u.id ? (
-                    <>
-                      <td style={{ padding: '6px 8px' }}><input value={usuarioEditando.nombre} onChange={e => setUsuarioEditando(x => ({ ...x, nombre: e.target.value }))} style={{ width: '100%', padding: '5px', border: '1px solid #ccc', borderRadius: '4px', fontSize: '13px' }} /></td>
-                      <td style={{ padding: '6px 8px' }}><input value={usuarioEditando.email} onChange={e => setUsuarioEditando(x => ({ ...x, email: e.target.value }))} style={{ width: '100%', padding: '5px', border: '1px solid #ccc', borderRadius: '4px', fontSize: '13px' }} /></td>
-                      <td style={{ padding: '6px 8px' }}>
-                        <select value={usuarioEditando.rol} onChange={e => setUsuarioEditando(x => ({ ...x, rol: e.target.value }))} style={{ padding: '5px', border: '1px solid #ccc', borderRadius: '4px', fontSize: '13px' }}>
-                          <option value="vendedor">Vendedor</option>
-                          <option value="admin">Admin</option>
-                        </select>
-                      </td>
-                      <td style={{ padding: '6px 8px' }}>
-                        <div style={{ display: 'flex', gap: '4px' }}>
-                          <input value={nuevaPasswordEdit} onChange={e => setNuevaPasswordEdit(e.target.value)} placeholder="Nueva contraseña (opcional)" style={{ flex: 1, padding: '5px', border: '1px solid #ccc', borderRadius: '4px', fontSize: '12px' }} />
-                          <button onClick={() => setNuevaPasswordEdit(generarPasswordAleatoria())} style={{ padding: '5px 8px', background: '#e2e8f0', border: '1px solid #cbd5e0', borderRadius: '4px', fontSize: '11px', cursor: 'pointer' }}>🎲</button>
-                        </div>
-                      </td>
-                      <td style={{ padding: '6px 8px', textAlign: 'center' }}>
-                        <button onClick={guardarEdicionUsuario} style={{ background: '#48bb78', color: 'white', border: 'none', borderRadius: '4px', padding: '4px 10px', cursor: 'pointer', fontSize: '12px', marginRight: '4px' }}>✓ Guardar</button>
-                        <button onClick={() => { setUsuarioEditando(null); setNuevaPasswordEdit(''); }} style={{ background: '#e2e8f0', color: '#4a5568', border: 'none', borderRadius: '4px', padding: '4px 10px', cursor: 'pointer', fontSize: '12px' }}>✕</button>
-                      </td>
-                    </>
-                  ) : (
-                    <>
-                      <td style={{ padding: '9px 8px', fontWeight: '600', color: '#111' }}>{u.nombre}</td>
-                      <td style={{ padding: '9px 8px', color: '#374151' }}>{u.email}</td>
-                      <td style={{ padding: '9px 8px' }}>
-                        <span style={{ display: 'inline-block', padding: '2px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: '600', background: u.rol === 'admin' ? '#fef3c7' : '#eff6ff', color: u.rol === 'admin' ? '#92400e' : '#1d4ed8' }}>
-                          {u.rol}
-                        </span>
-                      </td>
-                      <td style={{ padding: '9px 8px', color: '#9ca3af', fontSize: '12px' }}>••••••••</td>
-                      <td style={{ padding: '9px 8px', textAlign: 'center' }}>
-                        <button onClick={() => { setUsuarioEditando(u); setNuevaPasswordEdit(''); }} style={{ background: '#667eea', color: 'white', border: 'none', borderRadius: '4px', padding: '3px 10px', cursor: 'pointer', fontSize: '12px', marginRight: '4px' }}>Editar</button>
-                        {u.id !== user?.id && <button onClick={() => eliminarUsuario(u.id, u.nombre)} style={{ background: '#e53e3e', color: 'white', border: 'none', borderRadius: '4px', padding: '3px 10px', cursor: 'pointer', fontSize: '12px' }}>Eliminar</button>}
-                      </td>
-                    </>
-                  )}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
+        <GestionUsuarios
+          usuarios={usuarios} nuevoUsuario={nuevoUsuario} setNuevoUsuario={setNuevoUsuario}
+          usuarioEditando={usuarioEditando} setUsuarioEditando={setUsuarioEditando}
+          nuevaPasswordEdit={nuevaPasswordEdit} setNuevaPasswordEdit={setNuevaPasswordEdit}
+          crearUsuario={crearUsuario} guardarEdicionUsuario={guardarEdicionUsuario}
+          eliminarUsuario={eliminarUsuario} generarPasswordAleatoria={generarPasswordAleatoria}
+          currentUserId={user?.id}
+        />
       ) : mostrarGestionProductos && isAdmin ? (
-        <div style={{ padding: '16px', maxWidth: '900px', margin: '0 auto' }}>
-          <h2 style={{ marginBottom: '16px' }}>⚙️ Gestión de Productos</h2>
-
-          {/* Formulario nuevo producto */}
-          <div style={{ background: '#f8f9fa', border: '1px solid #ddd', borderRadius: '8px', padding: '16px', marginBottom: '24px' }}>
-            <h3 style={{ margin: '0 0 12px', fontSize: '14px' }}>Agregar nuevo producto</h3>
-            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-              <input value={nuevoProducto.nombre} onChange={e => setNuevoProducto(p => ({ ...p, nombre: e.target.value }))} placeholder="Nombre" style={{ flex: 2, padding: '6px 10px', border: '1px solid #ccc', borderRadius: '6px', fontSize: '13px', minWidth: '150px' }} />
-              <input type="number" value={nuevoProducto.precio_unitario} onChange={e => setNuevoProducto(p => ({ ...p, precio_unitario: e.target.value }))} placeholder="Precio" style={{ flex: 1, padding: '6px 10px', border: '1px solid #ccc', borderRadius: '6px', fontSize: '13px', minWidth: '80px' }} />
-              <select value={nuevoProducto.categoria} onChange={e => setNuevoProducto(p => ({ ...p, categoria: e.target.value }))} style={{ flex: 1, padding: '6px', border: '1px solid #ccc', borderRadius: '6px', fontSize: '13px', minWidth: '100px' }}>
-                {categorias.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
-              <button onClick={guardarProducto} style={{ background: '#48bb78', color: 'white', border: 'none', borderRadius: '6px', padding: '6px 16px', cursor: 'pointer', fontWeight: 600, fontSize: '13px' }}>+ Agregar</button>
-            </div>
-          </div>
-
-          {/* Lista de productos */}
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-            <thead>
-              <tr style={{ background: '#f0f0f0', borderBottom: '2px solid #ddd' }}>
-                <th style={{ padding: '8px', textAlign: 'left' }}>Nombre</th>
-                <th style={{ padding: '8px', textAlign: 'left' }}>Categoría</th>
-                <th style={{ padding: '8px', textAlign: 'right' }}>Precio</th>
-                <th style={{ padding: '8px', textAlign: 'center' }}>Estado</th>
-                <th style={{ padding: '8px', textAlign: 'center' }}>Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {todosProductos.map(p => (
-                <tr key={p.id} style={{ borderBottom: '1px solid #eee', opacity: p.activo ? 1 : 0.5 }}>
-                  {productoEditando?.id === p.id ? (
-                    <>
-                      <td style={{ padding: '6px' }}><input value={productoEditando.nombre} onChange={e => setProductoEditando(pe => ({ ...pe, nombre: e.target.value }))} style={{ width: '100%', padding: '4px', border: '1px solid #ccc', borderRadius: '4px', fontSize: '12px' }} /></td>
-                      <td style={{ padding: '6px' }}>
-                        <select value={productoEditando.categoria} onChange={e => setProductoEditando(pe => ({ ...pe, categoria: e.target.value }))} style={{ padding: '4px', border: '1px solid #ccc', borderRadius: '4px', fontSize: '12px' }}>
-                          {categorias.map(c => <option key={c} value={c}>{c}</option>)}
-                        </select>
-                      </td>
-                      <td style={{ padding: '6px' }}><input type="number" value={productoEditando.precio_unitario} onChange={e => setProductoEditando(pe => ({ ...pe, precio_unitario: e.target.value }))} style={{ width: '80px', padding: '4px', border: '1px solid #ccc', borderRadius: '4px', fontSize: '12px', textAlign: 'right' }} /></td>
-                      <td style={{ padding: '6px', textAlign: 'center' }}>—</td>
-                      <td style={{ padding: '6px', textAlign: 'center' }}>
-                        <button onClick={guardarEdicionProducto} style={{ background: '#48bb78', color: 'white', border: 'none', borderRadius: '4px', padding: '3px 8px', cursor: 'pointer', fontSize: '12px', marginRight: '4px' }}>✓</button>
-                        <button onClick={() => setProductoEditando(null)} style={{ background: '#e2e8f0', color: '#4a5568', border: 'none', borderRadius: '4px', padding: '3px 8px', cursor: 'pointer', fontSize: '12px' }}>✕</button>
-                      </td>
-                    </>
-                  ) : (
-                    <>
-                      <td style={{ padding: '8px' }}>{p.nombre}</td>
-                      <td style={{ padding: '8px', color: '#666' }}>{p.categoria}</td>
-                      <td style={{ padding: '8px', textAlign: 'right', fontWeight: 600 }}>${parseFloat(p.precio_unitario).toLocaleString()}</td>
-                      <td style={{ padding: '8px', textAlign: 'center' }}>
-                        <span style={{ background: p.activo ? '#c6f6d5' : '#fed7d7', color: p.activo ? '#276749' : '#9b2c2c', borderRadius: '12px', padding: '2px 8px', fontSize: '11px' }}>{p.activo ? 'Activo' : 'Inactivo'}</span>
-                      </td>
-                      <td style={{ padding: '8px', textAlign: 'center' }}>
-                        <button onClick={() => setProductoEditando({ id: p.id, nombre: p.nombre, precio_unitario: p.precio_unitario, categoria: p.categoria })} style={{ background: '#667eea', color: 'white', border: 'none', borderRadius: '4px', padding: '3px 8px', cursor: 'pointer', fontSize: '12px', marginRight: '4px' }}>Editar</button>
-                        <button onClick={() => toggleActivoProducto(p)} style={{ background: p.activo ? '#e53e3e' : '#48bb78', color: 'white', border: 'none', borderRadius: '4px', padding: '3px 8px', cursor: 'pointer', fontSize: '12px' }}>{p.activo ? 'Desactivar' : 'Activar'}</button>
-                      </td>
-                    </>
-                  )}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <GestionProductos
+          todosProductos={todosProductos} nuevoProducto={nuevoProducto} setNuevoProducto={setNuevoProducto}
+          productoEditando={productoEditando} setProductoEditando={setProductoEditando}
+          categorias={categorias}
+          guardarProducto={guardarProducto} guardarEdicionProducto={guardarEdicionProducto}
+          toggleActivoProducto={toggleActivoProducto}
+        />
       ) : mostrarHistorialCajas && isAdmin ? (
-        <div style={{ padding: '16px', maxWidth: '960px', margin: '0 auto' }}>
-          <h2 style={{ marginBottom: '16px' }}>🏦 Historial de Cajas</h2>
-          {historialCajas.length === 0 ? (
-            <p style={{ color: '#999', textAlign: 'center', padding: '32px' }}>No hay cajas registradas.</p>
-          ) : (
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-                <thead>
-                  <tr style={{ background: '#f1f5f9', borderBottom: '2px solid #e2e8f0' }}>
-                    <th style={{ padding: '10px 8px', textAlign: 'left', fontWeight: '600', color: '#374151' }}>#</th>
-                    <th style={{ padding: '10px 8px', textAlign: 'left', fontWeight: '600', color: '#374151' }}>Apertura</th>
-                    <th style={{ padding: '10px 8px', textAlign: 'left', fontWeight: '600', color: '#374151' }}>Cierre</th>
-                    <th style={{ padding: '10px 8px', textAlign: 'left', fontWeight: '600', color: '#374151' }}>Usuario</th>
-                    <th style={{ padding: '10px 8px', textAlign: 'right', fontWeight: '600', color: '#374151' }}>Inicio</th>
-                    <th style={{ padding: '10px 8px', textAlign: 'right', fontWeight: '600', color: '#374151' }}>Ventas</th>
-                    <th style={{ padding: '10px 8px', textAlign: 'right', fontWeight: '600', color: '#374151' }}>Retiros</th>
-                    <th style={{ padding: '10px 8px', textAlign: 'right', fontWeight: '600', color: '#374151' }}>Cierre contado</th>
-                    <th style={{ padding: '10px 8px', textAlign: 'right', fontWeight: '600', color: '#374151' }}>Diferencia</th>
-                    <th style={{ padding: '10px 8px', textAlign: 'center', fontWeight: '600', color: '#374151' }}>Estado</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {historialCajas.map((caja, idx) => {
-                    const apertura = new Date(caja.fecha_apertura);
-                    const cierre = caja.fecha_cierre ? new Date(caja.fecha_cierre) : null;
-                    const fmtFecha = (d) => d
-                      ? `${d.getDate().toString().padStart(2,'0')}/${(d.getMonth()+1).toString().padStart(2,'0')}/${d.getFullYear()} ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`
-                      : '—';
-                    const diferencia = parseFloat(caja.diferencia || 0);
-                    const difColor = diferencia > 0 ? '#16a34a' : diferencia < 0 ? '#dc2626' : '#374151';
-                    const difPrefix = diferencia > 0 ? '+' : '';
-                    return (
-                      <tr key={caja.id} style={{ borderBottom: '1px solid #e2e8f0', background: idx % 2 === 0 ? '#fff' : '#fafafa' }}>
-                        <td style={{ padding: '9px 8px', color: '#6b7280' }}>{caja.id}</td>
-                        <td style={{ padding: '9px 8px', color: '#111827' }}>{fmtFecha(apertura)}</td>
-                        <td style={{ padding: '9px 8px', color: '#111827' }}>{fmtFecha(cierre)}</td>
-                        <td style={{ padding: '9px 8px', color: '#111827' }}>{caja.usuario_nombre || '—'}</td>
-                        <td style={{ padding: '9px 8px', textAlign: 'right', color: '#111827' }}>${parseFloat(caja.monto_inicial || 0).toLocaleString()}</td>
-                        <td style={{ padding: '9px 8px', textAlign: 'right', color: '#16a34a', fontWeight: '600' }}>${parseFloat(caja.total_ventas || 0).toLocaleString()}</td>
-                        <td style={{ padding: '9px 8px', textAlign: 'right', color: '#dc2626' }}>${parseFloat(caja.total_retiros || 0).toLocaleString()}</td>
-                        <td style={{ padding: '9px 8px', textAlign: 'right', color: '#111827' }}>
-                          {caja.monto_cierre != null ? `$${parseFloat(caja.monto_cierre).toLocaleString()}` : '—'}
-                        </td>
-                        <td style={{ padding: '9px 8px', textAlign: 'right', fontWeight: '600', color: difColor }}>
-                          {caja.diferencia != null ? `${difPrefix}$${Math.abs(diferencia).toLocaleString()}` : '—'}
-                        </td>
-                        <td style={{ padding: '9px 8px', textAlign: 'center' }}>
-                          <span style={{
-                            display: 'inline-block', padding: '2px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: '600',
-                            background: caja.estado === 'abierta' ? '#dcfce7' : '#f1f5f9',
-                            color: caja.estado === 'abierta' ? '#16a34a' : '#6b7280'
-                          }}>
-                            {caja.estado === 'abierta' ? 'Abierta' : 'Cerrada'}
-                          </span>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-
+        <HistorialCajas historialCajas={historialCajas} />
       ) : mostrarMiTurno ? (
-        <div style={{ padding: '16px', maxWidth: '700px', margin: '0 auto' }}>
-          <h2 style={{ marginBottom: '16px' }}>👤 Mi Turno</h2>
-          {!turnoActivo ? (
-            <p style={{ color: '#999', textAlign: 'center', padding: '32px' }}>No tenés un turno activo.</p>
-          ) : (() => {
-            const inicio = new Date(turnoActivo.fecha_inicio);
-            const fmtHora = (d) => `${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;
-            const fmtFecha = (d) => `${d.getDate().toString().padStart(2,'0')}/${(d.getMonth()+1).toString().padStart(2,'0')}/${d.getFullYear()}`;
-            const ventasTurno = ventasDelDia.filter(v =>
-              v.estado !== 'cancelada' && new Date(v.fecha) >= inicio
-            );
-            const totalTurno = ventasTurno.reduce((s, v) => s + parseFloat(v.total || 0), 0);
-            const porMetodo = {};
-            ventasTurno.forEach(v => {
-              (v.pagos || []).forEach(p => {
-                porMetodo[p.metodo] = (porMetodo[p.metodo] || 0) + parseFloat(p.monto || 0);
-              });
-            });
-            return (
-              <>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '12px', marginBottom: '20px' }}>
-                  <div style={{ background: '#f0fdf4', border: '1px solid #86efac', borderRadius: '10px', padding: '14px', textAlign: 'center' }}>
-                    <div style={{ fontSize: '12px', color: '#16a34a', fontWeight: '600', marginBottom: '4px' }}>INICIO DE TURNO</div>
-                    <div style={{ fontSize: '18px', fontWeight: '700', color: '#111' }}>{fmtHora(inicio)}</div>
-                    <div style={{ fontSize: '12px', color: '#6b7280' }}>{fmtFecha(inicio)}</div>
-                  </div>
-                  <div style={{ background: '#eff6ff', border: '1px solid #93c5fd', borderRadius: '10px', padding: '14px', textAlign: 'center' }}>
-                    <div style={{ fontSize: '12px', color: '#2563eb', fontWeight: '600', marginBottom: '4px' }}>VENTAS</div>
-                    <div style={{ fontSize: '24px', fontWeight: '700', color: '#111' }}>{ventasTurno.length}</div>
-                  </div>
-                  <div style={{ background: '#fefce8', border: '1px solid #fde047', borderRadius: '10px', padding: '14px', textAlign: 'center' }}>
-                    <div style={{ fontSize: '12px', color: '#ca8a04', fontWeight: '600', marginBottom: '4px' }}>TOTAL RECAUDADO</div>
-                    <div style={{ fontSize: '22px', fontWeight: '700', color: '#111' }}>${totalTurno.toLocaleString()}</div>
-                  </div>
-                </div>
-
-                {Object.keys(porMetodo).length > 0 && (
-                  <div style={{ background: '#f8f9fa', borderRadius: '10px', padding: '14px', marginBottom: '20px' }}>
-                    <div style={{ fontSize: '13px', fontWeight: '600', color: '#374151', marginBottom: '10px' }}>Por medio de pago</div>
-                    <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                      {Object.entries(porMetodo).map(([metodo, monto]) => (
-                        <div key={metodo} style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '8px 14px', fontSize: '13px' }}>
-                          <span style={{ color: '#6b7280' }}>{metodo}:</span>
-                          <span style={{ fontWeight: '700', color: '#111', marginLeft: '6px' }}>${monto.toLocaleString()}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {ventasTurno.length > 0 && (
-                  <div style={{ overflowX: 'auto' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-                      <thead>
-                        <tr style={{ background: '#f1f5f9', borderBottom: '2px solid #e2e8f0' }}>
-                          <th style={{ padding: '8px', textAlign: 'left', color: '#374151' }}>Hora</th>
-                          <th style={{ padding: '8px', textAlign: 'left', color: '#374151' }}>Productos</th>
-                          <th style={{ padding: '8px', textAlign: 'left', color: '#374151' }}>Pago</th>
-                          <th style={{ padding: '8px', textAlign: 'right', color: '#374151' }}>Total</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {ventasTurno.map((v, idx) => {
-                          const fecha = new Date(v.fecha);
-                          return (
-                            <tr key={v.id} style={{ borderBottom: '1px solid #e2e8f0', background: idx % 2 === 0 ? '#fff' : '#fafafa' }}>
-                              <td style={{ padding: '8px', color: '#6b7280', whiteSpace: 'nowrap' }}>{fmtHora(fecha)}</td>
-                              <td style={{ padding: '8px', color: '#111' }}>{(v.items || []).map(it => `${it.cantidad}x ${it.nombre}`).join(', ')}</td>
-                              <td style={{ padding: '8px', color: '#6b7280' }}>{(v.pagos || []).map(p => p.metodo).join(', ')}</td>
-                              <td style={{ padding: '8px', textAlign: 'right', fontWeight: '600', color: '#111' }}>${parseFloat(v.total).toLocaleString()}</td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </>
-            );
-          })()}
-        </div>
-
+        <MiTurno turnoActivo={turnoActivo} ventasDelDia={ventasDelDia} user={user} />
       ) : mostrarHistorialTurnos && isAdmin ? (
-        <div style={{ padding: '16px', maxWidth: '960px', margin: '0 auto' }}>
-          <h2 style={{ marginBottom: '16px' }}>👥 Historial de Turnos</h2>
-          {turnoDetalle ? (
-            <>
-              <button onClick={() => setTurnoDetalle(null)} style={{ marginBottom: '16px', background: '#e2e8f0', border: 'none', borderRadius: '6px', padding: '6px 14px', cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}>← Volver</button>
-              <h3 style={{ fontSize: '15px', marginBottom: '12px', color: '#374151' }}>
-                Turno de {turnoDetalle.turno?.usuario_nombre || '—'} — {turnoDetalle.ventas?.length || 0} ventas
-              </h3>
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-                  <thead>
-                    <tr style={{ background: '#f1f5f9', borderBottom: '2px solid #e2e8f0' }}>
-                      <th style={{ padding: '8px', textAlign: 'left', color: '#374151' }}>Hora</th>
-                      <th style={{ padding: '8px', textAlign: 'left', color: '#374151' }}>Productos</th>
-                      <th style={{ padding: '8px', textAlign: 'left', color: '#374151' }}>Pago</th>
-                      <th style={{ padding: '8px', textAlign: 'right', color: '#374151' }}>Total</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(turnoDetalle.ventas || []).map((v, idx) => {
-                      const fecha = new Date(v.fecha);
-                      const fmtHora = (d) => `${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;
-                      return (
-                        <tr key={v.id} style={{ borderBottom: '1px solid #e2e8f0', background: idx % 2 === 0 ? '#fff' : '#fafafa' }}>
-                          <td style={{ padding: '8px', color: '#6b7280' }}>{fmtHora(fecha)}</td>
-                          <td style={{ padding: '8px', color: '#111' }}>{(v.items || []).map(it => `${it.cantidad}x ${it.nombre}`).join(', ')}</td>
-                          <td style={{ padding: '8px', color: '#6b7280' }}>{(v.pagos || []).map(p => p.metodo).join(', ')}</td>
-                          <td style={{ padding: '8px', textAlign: 'right', fontWeight: '600', color: '#111' }}>${parseFloat(v.total).toLocaleString()}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                  <tfoot>
-                    <tr style={{ borderTop: '2px solid #e2e8f0', background: '#f8fafc' }}>
-                      <td colSpan={3} style={{ padding: '8px', fontWeight: '700', color: '#374151' }}>TOTAL</td>
-                      <td style={{ padding: '8px', textAlign: 'right', fontWeight: '700', color: '#111' }}>
-                        ${(turnoDetalle.ventas || []).reduce((s, v) => s + parseFloat(v.total || 0), 0).toLocaleString()}
-                      </td>
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>
-            </>
-          ) : historialTurnos.length === 0 ? (
-            <p style={{ color: '#999', textAlign: 'center', padding: '32px' }}>No hay turnos registrados.</p>
-          ) : (
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-                <thead>
-                  <tr style={{ background: '#f1f5f9', borderBottom: '2px solid #e2e8f0' }}>
-                    <th style={{ padding: '10px 8px', textAlign: 'left', color: '#374151' }}>Vendedor</th>
-                    <th style={{ padding: '10px 8px', textAlign: 'left', color: '#374151' }}>Inicio</th>
-                    <th style={{ padding: '10px 8px', textAlign: 'left', color: '#374151' }}>Fin</th>
-                    <th style={{ padding: '10px 8px', textAlign: 'right', color: '#374151' }}>Ventas</th>
-                    <th style={{ padding: '10px 8px', textAlign: 'right', color: '#374151' }}>Total</th>
-                    <th style={{ padding: '10px 8px', textAlign: 'center', color: '#374151' }}>Estado</th>
-                    <th style={{ padding: '10px 8px', textAlign: 'center', color: '#374151' }}>Detalle</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {historialTurnos.map((t, idx) => {
-                    const inicio = new Date(t.fecha_inicio);
-                    const fin = t.fecha_fin ? new Date(t.fecha_fin) : null;
-                    const fmt = (d) => d ? `${d.getDate().toString().padStart(2,'0')}/${(d.getMonth()+1).toString().padStart(2,'0')} ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}` : '—';
-                    return (
-                      <tr key={t.id} style={{ borderBottom: '1px solid #e2e8f0', background: idx % 2 === 0 ? '#fff' : '#fafafa' }}>
-                        <td style={{ padding: '9px 8px', fontWeight: '600', color: '#111' }}>{t.usuario_nombre || '—'}</td>
-                        <td style={{ padding: '9px 8px', color: '#374151' }}>{fmt(inicio)}</td>
-                        <td style={{ padding: '9px 8px', color: '#374151' }}>{fmt(fin)}</td>
-                        <td style={{ padding: '9px 8px', textAlign: 'right', color: '#374151' }}>{t.cantidad_ventas}</td>
-                        <td style={{ padding: '9px 8px', textAlign: 'right', fontWeight: '600', color: '#16a34a' }}>${parseFloat(t.total_ventas || 0).toLocaleString()}</td>
-                        <td style={{ padding: '9px 8px', textAlign: 'center' }}>
-                          <span style={{ display: 'inline-block', padding: '2px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: '600', background: t.estado === 'abierto' ? '#dcfce7' : '#f1f5f9', color: t.estado === 'abierto' ? '#16a34a' : '#6b7280' }}>
-                            {t.estado === 'abierto' ? 'En curso' : 'Cerrado'}
-                          </span>
-                        </td>
-                        <td style={{ padding: '9px 8px', textAlign: 'center' }}>
-                          <button onClick={() => cargarDetalleTurno(t.id)} style={{ background: '#667eea', color: 'white', border: 'none', borderRadius: '4px', padding: '3px 10px', cursor: 'pointer', fontSize: '12px' }}>Ver</button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-
+        <HistorialTurnos
+          historialTurnos={historialTurnos} turnoDetalle={turnoDetalle}
+          setTurnoDetalle={setTurnoDetalle} cargarDetalleTurno={cargarDetalleTurno}
+        />
       ) : mostrarDashboard ? (
-        <div className="dashboard-container">
-          <h2 style={{ marginBottom: '16px' }}>📊 Dashboard de Ventas</h2>
-          <div className="periodo-selector">
-            <button className={periodoSeleccionado === 'HOY' ? 'periodo-btn active' : 'periodo-btn'} onClick={() => setPeriodoSeleccionado('HOY')}>HOY</button>
-            <button className={periodoSeleccionado === 'SEMANA' ? 'periodo-btn active' : 'periodo-btn'} onClick={() => setPeriodoSeleccionado('SEMANA')}>ESTA SEMANA</button>
-            <button className={periodoSeleccionado === 'MES' ? 'periodo-btn active' : 'periodo-btn'} onClick={() => setPeriodoSeleccionado('MES')}>ESTE MES</button>
-          </div>
-          <div className="dashboard-cards">
-            <div className="dashboard-card verde"><div className="card-icono">💰</div><div className="card-numero">${calcularMetricas().totalVentas.toLocaleString()}</div><div className="card-titulo">Total Vendido</div></div>
-            <div className="dashboard-card azul" style={{ cursor: 'pointer' }} onClick={() => setDetalleDashboard(detalleDashboard === 'ventas' ? null : 'ventas')}>
-              <div className="card-icono">🛒</div><div className="card-numero">{calcularMetricas().cantidadVentas}</div>
-              <div className="card-titulo">Ventas Realizadas</div>
-              <div style={{ fontSize: '11px', marginTop: '4px', opacity: 0.8 }}>{detalleDashboard === 'ventas' ? '▲ cerrar' : '▼ ver detalle'}</div>
-            </div>
-            <div className="dashboard-card naranja" style={{ cursor: 'pointer' }} onClick={() => setDetalleDashboard(detalleDashboard === 'productos' ? null : 'productos')}>
-              <div className="card-icono">📦</div><div className="card-numero">{calcularMetricas().cantidadProductos}</div>
-              <div className="card-titulo">Productos Vendidos</div>
-              <div style={{ fontSize: '11px', marginTop: '4px', opacity: 0.8 }}>{detalleDashboard === 'productos' ? '▲ cerrar' : '▼ ver detalle'}</div>
-            </div>
-            <div className="dashboard-card morado"><div className="card-icono">📈</div><div className="card-numero">${calcularMetricas().ventaPromedio.toLocaleString('es-AR', { maximumFractionDigits: 0 })}</div><div className="card-titulo">Venta Promedio</div></div>
-          </div>
-
-          {(() => {
-            const medios = calcularMetricasMedios(filtrarVentasPorPeriodo());
-            if (medios.lista.length === 0) return null;
-            return (
-              <div className="top-productos" style={{ marginTop: '16px' }}>
-                <h3 style={{ color: '#000', marginBottom: '12px' }}>Medios de Pago — {periodoSeleccionado}</h3>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-                  <thead>
-                    <tr style={{ backgroundColor: '#f0f0f0', borderBottom: '2px solid #ddd' }}>
-                      <th style={{ padding: '8px', textAlign: 'left', color: '#000' }}>Medio</th>
-                      <th style={{ padding: '8px', textAlign: 'right', color: '#000' }}>Total</th>
-                      <th style={{ padding: '8px', textAlign: 'right', color: '#000' }}>%</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {medios.lista.map((m, idx) => (
-                      <tr key={idx} style={{ borderBottom: '1px solid #eee' }}>
-                        <td style={{ padding: '8px', color: '#000', fontWeight: 'bold' }}>{m.metodo}</td>
-                        <td style={{ padding: '8px', textAlign: 'right', color: '#000' }}>${m.monto.toLocaleString()}</td>
-                        <td style={{ padding: '8px', textAlign: 'right', color: '#000' }}>{m.porcentaje}%</td>
-                      </tr>
-                    ))}
-                    <tr style={{ borderTop: '2px solid #111', fontWeight: 'bold', backgroundColor: '#f0f0f0' }}>
-                      <td style={{ padding: '8px', color: '#000' }}>TOTAL</td>
-                      <td style={{ padding: '8px', textAlign: 'right', color: '#000' }}>${medios.total.toLocaleString()}</td>
-                      <td style={{ padding: '8px', textAlign: 'right', color: '#000' }}>100%</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            );
-          })()}
-
-          {detalleDashboard === 'ventas' && (() => {
-            const ventas = filtrarVentasPorPeriodo();
-            return (
-              <div className="top-productos" style={{ marginTop: '16px' }}>
-                <h3 style={{ color: '#000', marginBottom: '12px' }}>🛒 Detalle de Ventas — {periodoSeleccionado}</h3>
-                {ventas.length === 0 ? (
-                  <div style={{ color: '#999', padding: '16px', textAlign: 'center' }}>Sin ventas en este período</div>
-                ) : (
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-                    <thead>
-                      <tr style={{ backgroundColor: '#f0f0f0', borderBottom: '2px solid #ddd' }}>
-                        <th style={{ padding: '8px', textAlign: 'left', color: '#000' }}>{periodoSeleccionado === 'HOY' ? 'Hora' : 'Fecha y hora'}</th>
-                        <th style={{ padding: '8px', textAlign: 'left', color: '#000' }}>Productos</th>
-                        <th style={{ padding: '8px', textAlign: 'left', color: '#000' }}>Medio de pago</th>
-                        <th style={{ padding: '8px', textAlign: 'right', color: '#000' }}>Total</th>
-                        {isAdmin && <th style={{ padding: '8px', textAlign: 'center', color: '#000' }}></th>}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {ventas.map((v, idx) => (
-                        <tr key={idx} style={{ borderBottom: '1px solid #eee' }}>
-                          <td style={{ padding: '8px', color: '#000', whiteSpace: 'nowrap' }}>
-                            {periodoSeleccionado !== 'HOY' && `${new Date(v.fecha).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' })} `}
-                            {new Date(v.fecha).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}
-                          </td>
-                          <td style={{ padding: '8px', color: '#000' }}>
-                            {(v.items || []).length === 0
-                              ? <span style={{ color: '#aaa' }}>—</span>
-                              : (v.items || []).map((it, i) => (
-                                <span key={i} style={{ display: 'block' }}>{it.cantidad}x {it.nombre}</span>
-                              ))
-                            }
-                          </td>
-                          <td style={{ padding: '8px', color: '#000' }}>
-                            {(v.pagos || []).map((p, i) => (
-                              <span key={i} style={{ display: 'block' }}>{p.metodo} ${parseFloat(p.monto).toLocaleString()}</span>
-                            ))}
-                          </td>
-                          <td style={{ padding: '8px', textAlign: 'right', fontWeight: 'bold', color: '#000' }}>${(v.total || 0).toLocaleString()}</td>
-                          {isAdmin && (
-                            <td style={{ padding: '8px', textAlign: 'right' }}>
-                              <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end' }}>
-                                <button onClick={() => abrirEdicionVenta(v)} style={{ background: '#667eea', color: 'white', border: 'none', borderRadius: '4px', padding: '3px 8px', cursor: 'pointer', fontSize: '12px' }}>Editar</button>
-                                <button onClick={() => eliminarVenta(v.id)} style={{ background: '#e53e3e', color: 'white', border: 'none', borderRadius: '4px', padding: '3px 8px', cursor: 'pointer', fontSize: '12px' }}>Eliminar</button>
-                              </div>
-                            </td>
-                          )}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
-              </div>
-            );
-          })()}
-
-          {detalleDashboard === 'productos' && (() => {
-            const ventas = filtrarVentasPorPeriodo();
-            const productosMap = {};
-            ventas.forEach(v => {
-              (v.items || []).forEach(it => {
-                const key = it.nombre || it.id;
-                if (!productosMap[key]) productosMap[key] = { nombre: it.nombre, cantidad: 0, total: 0 };
-                productosMap[key].cantidad += parseInt(it.cantidad) || 0;
-                productosMap[key].total += (parseFloat(it.precio) || 0) * (parseInt(it.cantidad) || 0);
-              });
-            });
-            const lista = Object.values(productosMap).sort((a, b) => b.cantidad - a.cantidad);
-            return (
-              <div className="top-productos" style={{ marginTop: '16px' }}>
-                <h3 style={{ color: '#000', marginBottom: '12px' }}>📦 Detalle de Productos Vendidos — {periodoSeleccionado}</h3>
-                {lista.length === 0 ? (
-                  <div style={{ color: '#999', padding: '16px', textAlign: 'center' }}>Sin productos en este período</div>
-                ) : (
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-                    <thead>
-                      <tr style={{ backgroundColor: '#f0f0f0', borderBottom: '2px solid #ddd' }}>
-                        <th style={{ padding: '8px', textAlign: 'left', color: '#000' }}>Producto</th>
-                        <th style={{ padding: '8px', textAlign: 'center', color: '#000' }}>Cantidad</th>
-                        <th style={{ padding: '8px', textAlign: 'right', color: '#000' }}>Subtotal</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {lista.map((p, idx) => (
-                        <tr key={idx} style={{ borderBottom: '1px solid #eee' }}>
-                          <td style={{ padding: '8px', color: '#000' }}>{p.nombre}</td>
-                          <td style={{ padding: '8px', textAlign: 'center', color: '#000' }}>{p.cantidad} u.</td>
-                          <td style={{ padding: '8px', textAlign: 'right', fontWeight: 'bold', color: '#000' }}>${p.total.toLocaleString()}</td>
-                        </tr>
-                      ))}
-                      <tr style={{ borderTop: '2px solid #ddd', backgroundColor: '#f8f8f8' }}>
-                        <td style={{ padding: '8px', fontWeight: 'bold', color: '#000' }}>TOTAL</td>
-                        <td style={{ padding: '8px', textAlign: 'center', fontWeight: 'bold', color: '#000' }}>{lista.reduce((s, p) => s + p.cantidad, 0)} u.</td>
-                        <td style={{ padding: '8px', textAlign: 'right', fontWeight: 'bold', color: '#000' }}>${lista.reduce((s, p) => s + p.total, 0).toLocaleString()}</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                )}
-              </div>
-            );
-          })()}
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '24px', marginTop: '24px' }}>
-            {/* CALENDARIO INTERACTIVO */}
-            <div className="top-productos">
-              <h3 style={{ color: '#000' }}>📅 Selecciona un Día</h3>
-              <div style={{ marginTop: '12px', padding: '16px', backgroundColor: '#f9f9f9', borderRadius: '6px', border: '1px solid #ddd' }}>
-                {(() => {
-                  const año = calAño;
-                  const mes = calMes;
-                  const primerDia = new Date(año, mes, 1);
-                  const ultimoDia = new Date(año, mes + 1, 0);
-                  const diaInicio = primerDia.getDay();
-                  const diasDelMes = ultimoDia.getDate();
-                  const diasSemana = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
-                  const nombreMes = new Date(año, mes).toLocaleDateString('es-AR', { month: 'long' });
-                  const años = [];
-                  for (let y = new Date().getFullYear(); y >= 2024; y--) años.push(y);
-                  const meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
-
-                  const irMesAnterior = () => {
-                    if (mes === 0) { setCalMes(11); setCalAño(año - 1); }
-                    else setCalMes(mes - 1);
-                  };
-                  const irMesSiguiente = () => {
-                    if (mes === 11) { setCalMes(0); setCalAño(año + 1); }
-                    else setCalMes(mes + 1);
-                  };
-
-                  return (
-                    <>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px', gap: '4px' }}>
-                        <button onClick={irMesAnterior} style={{ background: '#667eea', color: 'white', border: 'none', borderRadius: '4px', padding: '3px 8px', cursor: 'pointer', fontSize: '14px' }}>‹</button>
-                        <div style={{ display: 'flex', gap: '4px', flex: 1, justifyContent: 'center' }}>
-                          <select value={mes} onChange={e => setCalMes(Number(e.target.value))} style={{ fontSize: '11px', padding: '2px', border: '1px solid #ccc', borderRadius: '4px' }}>
-                            {meses.map((m, i) => <option key={i} value={i}>{m}</option>)}
-                          </select>
-                          <select value={año} onChange={e => setCalAño(Number(e.target.value))} style={{ fontSize: '11px', padding: '2px', border: '1px solid #ccc', borderRadius: '4px' }}>
-                            {años.map(y => <option key={y} value={y}>{y}</option>)}
-                          </select>
-                        </div>
-                        <button onClick={irMesSiguiente} style={{ background: '#667eea', color: 'white', border: 'none', borderRadius: '4px', padding: '3px 8px', cursor: 'pointer', fontSize: '14px' }}>›</button>
-                      </div>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '2px', marginBottom: '8px' }}>
-                        {diasSemana.map(dia => (
-                          <div key={dia} style={{ textAlign: 'center', fontWeight: 'bold', color: '#000', fontSize: '10px', padding: '2px' }}>
-                            {dia}
-                          </div>
-                        ))}
-                      </div>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '2px' }}>
-                        {Array(diaInicio).fill(null).map((_, i) => (
-                          <div key={`vacio-${i}`} style={{ padding: '4px', textAlign: 'center' }}></div>
-                        ))}
-                        {Array.from({ length: diasDelMes }, (_, i) => i + 1).map(dia => {
-                          const fechaString = `${año}-${String(mes + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
-                          const ventasEnEsteDia = ventasDelDia.filter(v => fechaLocal(v.fecha) === fechaString);
-                          const tieneVentas = ventasEnEsteDia.length > 0;
-                          const estaSeleccionado = diaSeleccionado === fechaString;
-
-                          return (
-                            <button
-                              key={dia}
-                              onClick={() => setDiaSeleccionado(fechaString)}
-                              style={{
-                                padding: '4px 2px',
-                                border: estaSeleccionado ? '2px solid #ff00ff' : '1px solid #ccc',
-                                backgroundColor: estaSeleccionado ? '#fff3e0' : tieneVentas ? '#e8f5e9' : '#fff',
-                                borderRadius: '4px',
-                                cursor: 'pointer',
-                                textAlign: 'center',
-                                color: '#000',
-                                fontSize: '11px',
-                                fontWeight: tieneVentas ? 'bold' : 'normal',
-                                transition: 'all 0.2s',
-                                minWidth: 0
-                              }}
-                              onMouseEnter={(e) => !estaSeleccionado && (e.target.style.backgroundColor = '#f0f0f0')}
-                              onMouseLeave={(e) => !estaSeleccionado && (e.target.style.backgroundColor = tieneVentas ? '#e8f5e9' : '#fff')}
-                            >
-                              {dia}
-                            </button>
-                          );
-                        })}
-                      </div>
-                      <div style={{ marginTop: '12px', fontSize: '12px', color: '#666' }}>
-                        <div>🟩 = Tiene ventas</div>
-                        <div>🟨 = Seleccionado</div>
-                      </div>
-                    </>
-                  );
-                })()}
-              </div>
-            </div>
-
-            {/* DETALLES DEL DÍA SELECCIONADO */}
-            <div className="top-productos">
-              <h3 style={{ color: '#000' }}>
-                {diaSeleccionado ? `📆 ${new Date(diaSeleccionado + 'T00:00:00').toLocaleDateString('es-AR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}` : '📆 Selecciona un día'}
-              </h3>
-              <div style={{ marginTop: '12px', maxHeight: '500px', overflowY: 'auto' }}>
-                {diaSeleccionado ? (() => {
-                  const ventasDelDiaSeleccionado = ventasDelDia.filter(v => fechaLocal(v.fecha) === diaSeleccionado);
-                  if (ventasDelDiaSeleccionado.length === 0) {
-                    return <div style={{ textAlign: 'center', padding: '20px', color: '#999' }}>No hay ventas este día</div>;
-                  }
-                  
-                  const totalDia = ventasDelDiaSeleccionado.reduce((sum, v) => sum + (parseFloat(v.total) || 0), 0);
-                  const totalProductos = ventasDelDiaSeleccionado.reduce((sum, v) => sum + (v.items?.length || 0), 0);
-                  
-                  // Agrupar productos por nombre
-                  const productosMap = {};
-                  ventasDelDiaSeleccionado.forEach(venta => {
-                    (venta.items || []).forEach(item => {
-                      if (!productosMap[item.nombre]) {
-                        productosMap[item.nombre] = { cantidad: 0, total: 0, precio: item.precio };
-                      }
-                      productosMap[item.nombre].cantidad += item.cantidad;
-                      productosMap[item.nombre].total += item.cantidad * item.precio;
-                    });
-                  });
-                  
-                  return (
-                    <>
-                      <div style={{ padding: '10px', backgroundColor: '#f0f0f0', borderRadius: '6px', marginBottom: '10px', fontSize: '12px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', color: '#000' }}>
-                          <span>💰 Total del día:</span>
-                          <span style={{ fontWeight: 'bold', fontSize: '14px' }}>${totalDia.toLocaleString()}</span>
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', color: '#000', marginBottom: '4px' }}>
-                          <span>🛒 Transacciones:</span>
-                          <span style={{ fontWeight: 'bold' }}>{ventasDelDiaSeleccionado.length}</span>
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', color: '#000' }}>
-                          <span>📦 Productos vendidos:</span>
-                          <span style={{ fontWeight: 'bold' }}>{totalProductos} unidades</span>
-                        </div>
-                      </div>
-
-                      <h4 style={{ color: '#000', marginTop: '10px', fontSize: '12px' }}>Productos vendidos:</h4>
-                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px', marginTop: '6px' }}>
-                        <thead>
-                          <tr style={{ backgroundColor: '#f0f0f0', borderBottom: '2px solid #ddd' }}>
-                            <th style={{ padding: '6px', textAlign: 'left', color: '#000' }}>Producto</th>
-                            <th style={{ padding: '6px', textAlign: 'center', color: '#000' }}>Cant.</th>
-                            <th style={{ padding: '6px', textAlign: 'right', color: '#000' }}>Total</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {Object.entries(productosMap).map(([nombre, datos], idx) => (
-                            <tr key={idx} style={{ borderBottom: '1px solid #eee' }}>
-                              <td style={{ padding: '6px', color: '#000' }}>{nombre}</td>
-                              <td style={{ padding: '6px', textAlign: 'center', color: '#000' }}>{datos.cantidad}x</td>
-                              <td style={{ padding: '6px', textAlign: 'right', fontWeight: 'bold', color: '#000' }}>${datos.total.toLocaleString()}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </>
-                  );
-                })() : (
-                  <div style={{ textAlign: 'center', padding: '20px', color: '#999' }}>
-                    Selecciona un día en el calendario para ver detalles de ventas
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          <div className="top-productos" style={{ marginTop: '24px' }}>
-            <h3 style={{ color: '#000' }}>📊 Reporte Semanal (Últimas 4 Semanas)</h3>
-            <div style={{ marginTop: '12px' }}>
-              {generarReporteSemanal().length > 0 ? (
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', color: '#000' }}>
-                  <thead>
-                    <tr style={{ backgroundColor: '#f0f0f0', borderBottom: '2px solid #ddd' }}>
-                      <th style={{ padding: '8px', textAlign: 'left', color: '#000' }}>Semana</th>
-                      <th style={{ padding: '8px', textAlign: 'right', color: '#000' }}>Productos Vendidos</th>
-                      <th style={{ padding: '8px', textAlign: 'right', color: '#000' }}>Total Vendido</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {generarReporteSemanal().map((sem, idx) => (
-                      <tr key={idx} style={{ borderBottom: '1px solid #eee' }}>
-                        <td style={{ padding: '8px', color: '#000' }}>{sem.semana}</td>
-                        <td style={{ padding: '8px', textAlign: 'right', color: '#000' }}>{sem.cantidadProductos} unidades</td>
-                        <td style={{ padding: '8px', textAlign: 'right', fontWeight: 'bold', color: '#000' }}>${sem.total.toLocaleString()}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              ) : (
-                <div style={{ textAlign: 'center', padding: '20px', color: '#999' }}>Sin datos de semanas</div>
-              )}
-            </div>
-          </div>
-
-          <div className="top-productos" style={{ marginTop: '24px' }}>
-            <h3 style={{ color: '#000' }}>📈 Reporte Mensual (Últimos 12 Meses)</h3>
-            <div style={{ marginTop: '12px' }}>
-              {generarReporteMensual().length > 0 ? (
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', color: '#000' }}>
-                  <thead>
-                    <tr style={{ backgroundColor: '#f0f0f0', borderBottom: '2px solid #ddd' }}>
-                      <th style={{ padding: '8px', textAlign: 'left', color: '#000' }}>Mes</th>
-                      <th style={{ padding: '8px', textAlign: 'right', color: '#000' }}>Productos Vendidos</th>
-                      <th style={{ padding: '8px', textAlign: 'right', color: '#000' }}>Total Vendido</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {generarReporteMensual().map((mes, idx) => (
-                      <tr key={idx} style={{ borderBottom: '1px solid #eee' }}>
-                        <td style={{ padding: '8px', color: '#000' }}>{mes.mes}</td>
-                        <td style={{ padding: '8px', textAlign: 'right', color: '#000' }}>{mes.cantidadProductos} unidades</td>
-                        <td style={{ padding: '8px', textAlign: 'right', fontWeight: 'bold', color: '#000' }}>${mes.total.toLocaleString()}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              ) : (
-                <div style={{ textAlign: 'center', padding: '20px', color: '#999' }}>Sin datos de meses</div>
-              )}
-            </div>
-          </div>
-        </div>
+        <Dashboard
+          ventasDelDia={ventasDelDia}
+          periodoSeleccionado={periodoSeleccionado} setPeriodoSeleccionado={setPeriodoSeleccionado}
+          detalleDashboard={detalleDashboard} setDetalleDashboard={setDetalleDashboard}
+          diaSeleccionado={diaSeleccionado} setDiaSeleccionado={setDiaSeleccionado}
+          calMes={calMes} setCalMes={setCalMes} calAño={calAño} setCalAño={setCalAño}
+          isAdmin={isAdmin} abrirEdicionVenta={abrirEdicionVenta} eliminarVenta={eliminarVenta}
+        />
       ) : (
-        <div className="container">
-          <div className="productos">
-            <h2>Productos</h2>
-            {categoriaActiva === null ? (
-              <div className="categorias-menu">
-                {categorias.map(cat => (
-  <button 
-    key={cat} 
-    className={`categoria-btn 
-      ${cat === 'TORTAS' ? 'torta-hero' : ''} 
-      ${cat === 'TENTACIONES' ? 'tentacion-hero' : ''} 
-      ${cat === 'PALITOS' ? 'palitos-hero' : ''} 
-      ${cat === 'PIZZAS' ? 'pizzas-hero' : ''} 
-      ${cat === 'FAMILIARES' ? 'familiar-hero' : ''} 
-      ${cat === 'CUCURUCHOS' ? 'cucuruchos-hero' : ''} 
-      ${cat === 'POSTRES' ? 'bombones-hero' : ''} 
-      ${cat === 'GRANEL' ? 'granel-hero' : ''} 
-      ${cat === 'BEBIDAS' ? 'bebidas-hero' : ''} 
-      ${cat === 'BATIDOS' ? 'batidos-hero' : ''}
-      ${cat === 'SIN TACC' ? 'sintacc-hero' : ''}
-      ${cat === 'CHOCOLATES' ? 'chocolates-hero' : ''}`}
-    aria-label={cat} 
-    onClick={() => setCategoriaActiva(cat)}
-  >
-    {!['TORTAS', 'TENTACIONES', 'PALITOS', 'PIZZAS', 'FAMILIARES', 'CUCURUCHOS', 'POSTRES', 'GRANEL', 'BEBIDAS', 'BATIDOS', 'SIN TACC', 'CHOCOLATES'].includes(cat) && cat}
-  </button>
-))} 
-              </div>
-            ) : (
-              <>
-                <button className="btn-volver" onClick={() => setCategoriaActiva(null)}>← VOLVER A CATEGORÍAS</button>
-                <h3>{categoriaActiva}</h3>
-                <div className="productos-grid">
-                  {categoriaActiva === 'PALITOS' ? (() => {
-                    const palitos = productos.filter(p => p.categoria === 'PALITOS');
-                    const bases = Array.from(new Set(palitos.map(p => p.nombre.replace(/\s+x\d+$/, ''))));
-                    return (
-                      <div className="palitos-rows">
-                        {bases.map(base => {
-                          const opciones = palitos.filter(p => p.nombre.startsWith(base));
-                          return (
-                            <div key={base} className="palitos-row">
-                              {opciones.map(producto => (
-                                <button key={producto.id} className="producto-btn" onClick={() => agregarAlCarrito(producto)}>
-                                  <div>{producto.nombre}</div>
-                                  <div className="precio">${producto.precio}</div>
-                                </button>
-                              ))}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    );
-                  })() : productos.filter(p => p.categoria === categoriaActiva).map(producto => (
-                    <button key={producto.id} className="producto-btn" onClick={() => agregarAlCarrito(producto)}>
-                      <div>{producto.nombre}</div>
-                      <div className="precio">${producto.precio}</div>
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
-
-          <div className="carrito">
-            <h2>Carrito</h2>
-            {carrito.length === 0 ? <p className="carrito-vacio">El carrito está vacío</p> : (
-              <>
-                <div className="carrito-items">
-                  {carrito.map(item => (
-                    <div key={item.id} className={`carrito-item ${seleccionado === item.id ? 'seleccionado' : ''}`} onClick={() => setSeleccionado(item.id)}>
-                      <span>{item.nombre}</span>
-                      <span>{item.cantidad}</span>
-                      <span className="item-total">${item.precio * item.cantidad}</span>
-                    </div>
-                  ))}
-                </div>
-                <div className="total"><h3>TOTAL: ${totalCarrito}</h3></div>
-                <div className="botones">
-                  <button className="btn-cobrar" onClick={cobrar}>COBRAR</button>
-                  <button className="btn-borrar" onClick={eliminarSeleccionado} disabled={seleccionado === null}>BORRAR</button>
-                  <button className="btn-limpiar" onClick={limpiarCarrito}>LIMPIAR TODO</button>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
+        <POSView
+          categorias={categorias} categoriaActiva={categoriaActiva} setCategoriaActiva={setCategoriaActiva}
+          productos={productos} agregarAlCarrito={agregarAlCarrito}
+          carrito={carrito} seleccionado={seleccionado} setSeleccionado={setSeleccionado}
+          cobrar={cobrar} eliminarSeleccionado={eliminarSeleccionado} limpiarCarrito={limpiarCarrito}
+        />
       )}
 
+      {/* Modales */}
       {mostrarModalPago && (
-        <div className="modal-overlay" onClick={cancelarVenta}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <h2>💳 Método de Pago</h2>
-            <div className="modal-total">
-              <span>Total a cobrar:</span>
-              <span className="modal-total-precio">${carrito.reduce((sum, item) => sum + (item.precio * item.cantidad), 0).toLocaleString()}</span>
-            </div>
-
-            {pagosSeleccionados.length > 0 && (
-              <div className="pagos-seleccionados">
-                {pagosSeleccionados.map((pago, index) => (
-                  <div key={index} className="pago-item">
-                    <span className="pago-metodo">{pago.metodo}</span>
-                    <input name={`pago-monto-${index}`} type="number" className="pago-monto-input" value={pago.monto} onChange={(e) => actualizarMontoPago(index, e.target.value)} placeholder="Monto" />
-                    <button className="pago-quitar" onClick={() => quitarMetodoPago(index)}>✕</button>
-                  </div>
-                ))}
-
-                <div className="pago-total-parcial">
-                  <span>Total ingresado:</span>
-                  <span className={pagosSeleccionados.reduce((sum, p) => sum + p.monto, 0) === carrito.reduce((sum, item) => sum + (item.precio * item.cantidad), 0) ? 'total-correcto' : 'total-incorrecto'}>
-                    ${pagosSeleccionados.reduce((sum, p) => sum + p.monto, 0).toLocaleString()}
-                  </span>
-                </div>
-
-                {/* Resumen legible de los métodos (útil para ticket / impresión) */}
-                <div className="metodos-resumen">
-                  <div className="label">Medios usados:</div>
-                  <div className="metodos-list">
-                    {pagosSeleccionados.map((p, i) => (
-                      <div key={i} className="metodo-line">{p.metodo} — ${p.monto.toLocaleString()}</div>
-                    ))}
-                  </div>
-                </div>
-
-              </div>
-            )}
-
-            {pagosSeleccionados.length < 2 && (
-              <div className="modal-botones">
-                <button className="metodo-pago-btn efectivo" onClick={() => agregarMetodoPago('EFECTIVO')}>EFECTIVO</button>
-                <button className="metodo-pago-btn debito" onClick={() => agregarMetodoPago('DÉBITO')}>DÉBITO</button>
-                <button className="metodo-pago-btn transferencia" onClick={() => agregarMetodoPago('TRANSFERENCIA')}>TRANSFERENCIA</button>
-                <button className="metodo-pago-btn qr" onClick={() => agregarMetodoPago('QR')}>QR</button>
-              </div>
-            )}
-
-            <div className="modal-acciones">
-              {pagosSeleccionados.length > 0 && (
-                <button className="modal-confirmar" onClick={confirmarVenta}>✓ CONFIRMAR VENTA</button>
-              )}
-              <button className="modal-cancelar" onClick={cancelarVenta}>Cancelar</button>
-            </div>
-          </div>
-        </div>
+        <ModalPago
+          carrito={carrito} pagosSeleccionados={pagosSeleccionados}
+          agregarMetodoPago={agregarMetodoPago} quitarMetodoPago={quitarMetodoPago}
+          actualizarMontoPago={actualizarMontoPago}
+          confirmarVenta={confirmarVenta} cancelarVenta={cancelarVenta}
+        />
       )}
-
       {ventaConfirmada && (
-        <div className="modal-overlay" onClick={cerrarResumenVenta}>
-          <div className="modal-content resumen-venta" onClick={(e) => e.stopPropagation()}>
-            <h2>✅ ¡Venta Confirmada!</h2>
-            <div className="resumen-venta-contenido">
-              <div className="resumen-venta-item">
-                <span>Total:</span>
-                <span className="resumen-venta-total">${ventaConfirmada.total.toLocaleString()}</span>
-              </div>
-              {ventaConfirmada.pagos && ventaConfirmada.pagos.length > 0 && (
-                <div className="resumen-venta-pagos">
-                  <h4>Medios de Pago:</h4>
-                  {ventaConfirmada.pagos.map((p, idx) => (
-                    <div key={idx} className="resumen-venta-pago">
-                      <span>{p.metodo}</span>
-                      <span>${p.monto.toLocaleString()}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-              {ventaConfirmada.items && ventaConfirmada.items.length > 0 && (
-                <div className="resumen-venta-items">
-                  <h4>Productos:</h4>
-                  {ventaConfirmada.items.map((it, idx) => (
-                    <div key={idx} className="resumen-venta-item-detalle">
-                      <span>{it.cantidad}x {it.nombre}</span>
-                      <span>${(it.cantidad * it.precio).toLocaleString()}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-            <div className="modal-acciones-resumen">
-              <button className="modal-imprimir" onClick={() => printTicket(ventaConfirmada)}>🖨️ IMPRIMIR TICKET</button>
-              <button className="modal-confirmar" onClick={cerrarResumenVenta}>✓ CONTINUAR</button>
-            </div>
-          </div>
-        </div>
+        <VentaConfirmada
+          ventaConfirmada={ventaConfirmada}
+          cerrarResumenVenta={cerrarResumenVenta}
+          printTicket={printTicket}
+        />
       )}
-
-      {/* Modal edición de venta — solo admin */}
       {ventaEditando && (
-        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', padding:'16px' }}>
-          <div style={{ background:'white', borderRadius:'12px', padding:'24px', width:'100%', maxWidth:'560px', maxHeight:'90vh', overflowY:'auto' }}>
-            <h3 style={{ margin:'0 0 16px', color:'#2d3748' }}>Editar venta</h3>
-
-            {/* Items */}
-            <h4 style={{ margin:'0 0 8px', color:'#4a5568' }}>Productos</h4>
-            {ventaEditando.items.map((it, idx) => (
-              <div key={idx} style={{ display:'flex', alignItems:'center', gap:'8px', marginBottom:'6px', background:'#f8f9fa', padding:'6px 10px', borderRadius:'6px' }}>
-                <span style={{ flex:1, fontSize:'13px' }}>{it.nombre}</span>
-                <span style={{ fontSize:'12px', color:'#718096' }}>${it.precio.toLocaleString()} c/u</span>
-                <input
-                  type="text" inputMode="numeric" pattern="[0-9]*"
-                  value={it.cantidad}
-                  onChange={e => {
-                    const c = Math.max(1, parseInt(e.target.value) || 1);
-                    setVentaEditando(prev => { const items = [...prev.items]; items[idx] = { ...items[idx], cantidad: c }; return { ...prev, items }; });
-                  }}
-                  style={{ width:'48px', textAlign:'center', border:'1px solid #cbd5e0', borderRadius:'4px', padding:'3px' }}
-                />
-                <span style={{ fontSize:'13px', fontWeight:600, minWidth:'70px', textAlign:'right' }}>${(it.precio * it.cantidad).toLocaleString()}</span>
-                <button onClick={() => setVentaEditando(prev => ({ ...prev, items: prev.items.filter((_,i) => i !== idx) }))}
-                  style={{ background:'#e53e3e', color:'white', border:'none', borderRadius:'4px', padding:'2px 7px', cursor:'pointer', fontSize:'13px' }}>✕</button>
-              </div>
-            ))}
-            <div style={{ display:'flex', gap:'8px', marginTop:'8px', marginBottom:'16px' }}>
-              <select value={productoAgregarEdit} onChange={e => setProductoAgregarEdit(e.target.value)}
-                style={{ flex:1, padding:'6px', border:'1px solid #cbd5e0', borderRadius:'6px', fontSize:'13px' }}>
-                <option value="">— Agregar producto —</option>
-                {productos.map(p => (
-                  <option key={p.id} value={p.id}>{p.nombre} (${p.precio.toLocaleString()})</option>
-                ))}
-              </select>
-              <button onClick={() => {
-                const prod = productos.find(p => String(p.id) === String(productoAgregarEdit));
-                if (!prod) return;
-                setVentaEditando(prev => {
-                  const existe = prev.items.findIndex(it => it.id === prod.id);
-                  if (existe >= 0) {
-                    const items = [...prev.items];
-                    items[existe] = { ...items[existe], cantidad: items[existe].cantidad + 1 };
-                    return { ...prev, items };
-                  }
-                  return { ...prev, items: [...prev.items, { id: prod.id, nombre: prod.nombre, cantidad: 1, precio: prod.precio }] };
-                });
-                setProductoAgregarEdit('');
-              }} style={{ background:'#48bb78', color:'white', border:'none', borderRadius:'6px', padding:'6px 14px', cursor:'pointer', fontWeight:600 }}>+ Agregar</button>
-            </div>
-
-            {/* Pagos */}
-            <h4 style={{ margin:'0 0 8px', color:'#4a5568' }}>Medios de pago</h4>
-            {ventaEditando.pagos.map((p, idx) => (
-              <div key={idx} style={{ display:'flex', alignItems:'center', gap:'8px', marginBottom:'6px', background:'#f8f9fa', padding:'6px 10px', borderRadius:'6px' }}>
-                <select value={p.metodo} onChange={e => setVentaEditando(prev => { const pagos=[...prev.pagos]; pagos[idx]={...pagos[idx], metodo:e.target.value}; return {...prev,pagos}; })}
-                  style={{ flex:1, padding:'4px', border:'1px solid #cbd5e0', borderRadius:'4px', fontSize:'13px' }}>
-                  <option value="EFECTIVO">EFECTIVO</option>
-                  <option value="TRANSFERENCIA">TRANSFERENCIA</option>
-                  <option value="DÉBITO">DÉBITO</option>
-                </select>
-                <input type="text" inputMode="numeric" pattern="[0-9]*"
-                  value={p.monto}
-                  onChange={e => setVentaEditando(prev => { const pagos=[...prev.pagos]; pagos[idx]={...pagos[idx], monto:parseInt(e.target.value)||0}; return {...prev,pagos}; })}
-                  style={{ width:'90px', textAlign:'right', border:'1px solid #cbd5e0', borderRadius:'4px', padding:'3px 6px', fontSize:'13px' }}
-                />
-                <button onClick={() => setVentaEditando(prev => ({ ...prev, pagos: prev.pagos.filter((_,i) => i !== idx) }))}
-                  style={{ background:'#e53e3e', color:'white', border:'none', borderRadius:'4px', padding:'2px 7px', cursor:'pointer', fontSize:'13px' }}>✕</button>
-              </div>
-            ))}
-            <button onClick={() => setVentaEditando(prev => ({ ...prev, pagos: [...prev.pagos, { metodo:'EFECTIVO', monto:0 }] }))}
-              style={{ background:'#667eea', color:'white', border:'none', borderRadius:'6px', padding:'5px 12px', cursor:'pointer', fontSize:'13px', marginBottom:'16px' }}>+ Agregar pago</button>
-
-            {/* Totales */}
-            {(() => {
-              const totItems = ventaEditando.items.reduce((s,it) => s + it.precio * it.cantidad, 0);
-              const totPagos = ventaEditando.pagos.reduce((s,p) => s + Number(p.monto||0), 0);
-              const ok = Math.abs(totItems - totPagos) <= 0.01;
-              return (
-                <div style={{ background:'#f0f4ff', borderRadius:'8px', padding:'10px 14px', marginBottom:'16px' }}>
-                  <div style={{ display:'flex', justifyContent:'space-between', fontSize:'14px', marginBottom:'4px' }}>
-                    <span>Total productos:</span><span style={{ fontWeight:700 }}>${totItems.toLocaleString()}</span>
-                  </div>
-                  <div style={{ display:'flex', justifyContent:'space-between', fontSize:'14px', marginBottom:'4px' }}>
-                    <span>Total pagos:</span><span style={{ fontWeight:700, color: ok ? '#38a169' : '#e53e3e' }}>${totPagos.toLocaleString()}</span>
-                  </div>
-                  {!ok && <div style={{ color:'#e53e3e', fontSize:'12px', marginTop:'4px' }}>Los totales no coinciden</div>}
-                </div>
-              );
-            })()}
-
-            <div style={{ display:'flex', gap:'10px', justifyContent:'flex-end' }}>
-              <button onClick={() => setVentaEditando(null)} style={{ background:'#e2e8f0', color:'#4a5568', border:'none', borderRadius:'8px', padding:'8px 20px', cursor:'pointer', fontWeight:600 }}>Cancelar</button>
-              <button onClick={guardarEdicionVenta} style={{ background:'#667eea', color:'white', border:'none', borderRadius:'8px', padding:'8px 20px', cursor:'pointer', fontWeight:600 }}>Guardar cambios</button>
-            </div>
-          </div>
-        </div>
+        <ModalEditarVenta
+          ventaEditando={ventaEditando} setVentaEditando={setVentaEditando}
+          productos={productos}
+          productoAgregarEdit={productoAgregarEdit} setProductoAgregarEdit={setProductoAgregarEdit}
+          guardarEdicionVenta={guardarEdicionVenta}
+        />
       )}
-
     </div>
   );
 }
