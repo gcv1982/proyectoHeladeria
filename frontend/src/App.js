@@ -12,6 +12,7 @@ import HistorialCajas from './components/HistorialCajas';
 import HistorialTurnos from './components/HistorialTurnos';
 import MiTurno from './components/MiTurno';
 import Dashboard from './components/Dashboard';
+import ComparativaView from './components/ComparativaView';
 import ModalPago from './components/ModalPago';
 import VentaConfirmada from './components/VentaConfirmada';
 import ModalEditarVenta from './components/ModalEditarVenta';
@@ -54,6 +55,7 @@ function AppInner() {
   const [mostrarDashboard, setMostrarDashboard] = useState(false);
   const [mostrarRetiros, setMostrarRetiros] = useState(false);
   const [mostrarCaja, setMostrarCaja] = useState(false);
+  const [mostrarComparativa, setMostrarComparativa] = useState(false);
   const [mostrarGestionProductos, setMostrarGestionProductos] = useState(false);
   const [mostrarGestionUsuarios, setMostrarGestionUsuarios] = useState(false);
   const [mostrarHistorialCajas, setMostrarHistorialCajas] = useState(false);
@@ -141,6 +143,7 @@ function AppInner() {
     setMostrarDashboard(false); setMostrarCaja(false); setMostrarRetiros(false);
     setMostrarGestionProductos(false); setMostrarGestionUsuarios(false);
     setMostrarHistorialCajas(false); setMostrarMiTurno(false); setMostrarHistorialTurnos(false);
+    setMostrarComparativa(false);
   };
 
   // ── Efectos ────────────────────────────────────────────────────────────────
@@ -741,6 +744,7 @@ function AppInner() {
             {isAdmin && <button className={`nav-btn ${mostrarGestionUsuarios ? 'active' : ''}`} onClick={() => { navClear(); setMostrarGestionUsuarios(true); cargarUsuarios(); }}>Usuarios</button>}
             {isAdmin && <button className={`nav-btn ${mostrarHistorialCajas ? 'active' : ''}`} onClick={() => { navClear(); setMostrarHistorialCajas(true); cargarHistorialCajas(); }}>Cajas</button>}
             {isAdmin && <button className={`nav-btn ${mostrarHistorialTurnos ? 'active' : ''}`} onClick={() => { navClear(); setMostrarHistorialTurnos(true); setTurnoDetalle(null); cargarHistorialTurnos(); }}>Turnos</button>}
+            {isAdmin && <button className={`nav-btn ${mostrarComparativa ? 'active' : ''}`} onClick={() => { navClear(); setMostrarComparativa(true); }}>Comparativa</button>}
           </nav>
           <div className="header-right" style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
             <button className={`btn-open-caja ${cajaAbierta ? 'open' : ''}`} onClick={() => { navClear(); setMostrarCaja(true); }}>{cajaAbierta ? '💰 Caja Abierta' : '💰 Abrir Caja'}</button>
@@ -823,6 +827,8 @@ function AppInner() {
           historialTurnos={historialTurnos} turnoDetalle={turnoDetalle}
           setTurnoDetalle={setTurnoDetalle} cargarDetalleTurno={cargarDetalleTurno}
         />
+      ) : mostrarComparativa ? (
+        <ComparativaView ventasDelDia={ventasDelDia} />
       ) : mostrarDashboard ? (
         <Dashboard
           ventasDelDia={ventasDelDia}

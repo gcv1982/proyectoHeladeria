@@ -1,5 +1,5 @@
 
-import React from 'react';
+import { useState } from 'react';
 
 export default function POSView({
   categorias, categoriaActiva, setCategoriaActiva,
@@ -7,13 +7,60 @@ export default function POSView({
   carrito, seleccionado, setSeleccionado,
   cobrar, eliminarSeleccionado, limpiarCarrito,
 }) {
+  const [busqueda, setBusqueda] = useState('');
   const totalCarrito = carrito.reduce((total, item) => total + (item.precio * item.cantidad), 0);
+
+  const productosFiltrados = busqueda.trim()
+    ? productos.filter(p => p.nombre.toLowerCase().includes(busqueda.toLowerCase()))
+    : [];
+
+  const limpiarBusqueda = () => setBusqueda('');
 
   return (
     <div className="container">
       <div className="productos">
-        <h2>Productos</h2>
-        {categoriaActiva === null ? (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+          <h2 style={{ margin: 0 }}>Productos</h2>
+          <div style={{ position: 'relative', flex: 1, maxWidth: '320px', marginLeft: 'auto' }}>
+            <input
+              type="text"
+              value={busqueda}
+              onChange={e => setBusqueda(e.target.value)}
+              placeholder="Buscar producto..."
+              style={{
+                width: '100%', padding: '8px 36px 8px 12px', border: '2px solid #cbd5e0',
+                borderRadius: '8px', fontSize: '14px', outline: 'none', boxSizing: 'border-box',
+                borderColor: busqueda ? '#667eea' : '#cbd5e0',
+              }}
+            />
+            {busqueda && (
+              <button onClick={limpiarBusqueda} style={{
+                position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)',
+                background: 'none', border: 'none', cursor: 'pointer', fontSize: '16px', color: '#a0aec0', padding: 0,
+              }}>✕</button>
+            )}
+          </div>
+        </div>
+
+        {busqueda.trim() ? (
+          <div>
+            {productosFiltrados.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '32px', color: '#a0aec0', fontSize: '14px' }}>
+                Sin resultados para "{busqueda}"
+              </div>
+            ) : (
+              <div className="productos-grid">
+                {productosFiltrados.map(producto => (
+                  <button key={producto.id} className="producto-btn" onClick={() => { agregarAlCarrito(producto); limpiarBusqueda(); }}>
+                    <div>{producto.nombre}</div>
+                    <div style={{ fontSize: '10px', color: '#a0aec0' }}>{producto.categoria}</div>
+                    <div className="precio">${producto.precio}</div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : categoriaActiva === null ? (
           <div className="categorias-menu">
             {categorias.map(cat => (
               <button

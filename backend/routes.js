@@ -79,7 +79,7 @@ router.get('/turnos/:id/ventas', verificarToken, obtenerVentasTurno);
 // ========== CAJAS ==========
 const { abrirCaja, cerrarCaja, obtenerCajaAbierta, obtenerHistorialCajas } = require('./controllers/cajas');
 router.post('/cajas/abrir', verificarToken, abrirCaja);
-router.put('/cajas/:id/cerrar', verificarToken, verificarRol(['admin']), cerrarCaja);
+router.put('/cajas/:id/cerrar', verificarToken, cerrarCaja);
 router.get('/cajas/abierta', verificarToken, obtenerCajaAbierta);
 router.get('/cajas/historial', verificarToken, verificarRol(['admin']), obtenerHistorialCajas);
 
@@ -87,7 +87,7 @@ router.get('/cajas/historial', verificarToken, verificarRol(['admin']), obtenerH
 const { enviarResumenCierre } = require('./services/emailService');
 
 
-router.post('/email/resumen-cierre', verificarToken, verificarRol(['admin']), async (req, res) => {
+router.post('/email/resumen-cierre', verificarToken, async (req, res) => {
   try {
     const { fecha, resumen, ventasPorMedio, retiros, gastos } = req.body;
     await enviarResumenCierre({ fecha, resumen, ventasPorMedio, retiros, gastos });
