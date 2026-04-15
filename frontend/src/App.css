@@ -2078,6 +2078,9 @@
 .cierre-caja .resumen-item { padding: 1px 4px; font-size: 13px; line-height: 1.2; min-height: unset; }
 .cierre-caja .resumen-item span:first-child { font-size: 13px; }
 .cierre-caja .monto { font-size: 12px; }
+.cierre-caja .resumen-item.resumen-destacado { font-size: 14px !important; }
+.cierre-caja .resumen-item.resumen-destacado span { font-size: 14px !important; }
+.cierre-caja .resumen-item.resumen-destacado .monto { font-size: 14px !important; }
 .cierre-caja .resumen-item.final {
   font-size: 15px !important;
   padding: 8px 10px !important;

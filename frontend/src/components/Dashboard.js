@@ -285,6 +285,7 @@ export default function Dashboard({
               }
               const totalDia = ventasDelDiaSeleccionado.reduce((sum, v) => sum + (parseFloat(v.total) || 0), 0);
               const totalProductos = ventasDelDiaSeleccionado.reduce((sum, v) => sum + (v.items?.length || 0), 0);
+              const mediosDia = calcularMetricasMedios(ventasDelDiaSeleccionado);
               const productosMap = {};
               ventasDelDiaSeleccionado.forEach(venta => {
                 (venta.items || []).forEach(item => {
@@ -309,6 +310,29 @@ export default function Dashboard({
                       <span style={{ fontWeight: 'bold' }}>{totalProductos} unidades</span>
                     </div>
                   </div>
+                  {mediosDia.lista.length > 0 && (
+                    <>
+                      <h4 style={{ color: '#000', marginTop: '10px', fontSize: '12px' }}>Medios de pago:</h4>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px', marginTop: '6px', marginBottom: '10px' }}>
+                        <thead>
+                          <tr style={{ backgroundColor: '#f0f0f0', borderBottom: '2px solid #ddd' }}>
+                            <th style={{ padding: '6px', textAlign: 'left', color: '#000' }}>Medio</th>
+                            <th style={{ padding: '6px', textAlign: 'right', color: '#000' }}>Total</th>
+                            <th style={{ padding: '6px', textAlign: 'right', color: '#000' }}>%</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {mediosDia.lista.map((m, idx) => (
+                            <tr key={idx} style={{ borderBottom: '1px solid #eee' }}>
+                              <td style={{ padding: '6px', color: '#000', fontWeight: 'bold' }}>{m.metodo}</td>
+                              <td style={{ padding: '6px', textAlign: 'right', color: '#000' }}>${m.monto.toLocaleString()}</td>
+                              <td style={{ padding: '6px', textAlign: 'right', color: '#000' }}>{m.porcentaje}%</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </>
+                  )}
                   <h4 style={{ color: '#000', marginTop: '10px', fontSize: '12px' }}>Productos vendidos:</h4>
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px', marginTop: '6px' }}>
                     <thead>

@@ -50,8 +50,8 @@ export default function CajaView({
 
             <div className="cierre-resumen">
               <h3>📊 Resumen del Día</h3>
-              <div className="resumen-item"><span>Inicio de Caja:</span><span className="monto">${resumen.montoInicial.toLocaleString()}</span></div>
-              <div className="resumen-item"><span>Ventas del Día:</span><span className="monto positivo">${resumen.totalVentas.toLocaleString()}</span></div>
+              <div className="resumen-item resumen-destacado"><span>Inicio de Caja:</span><span className="monto">${resumen.montoInicial.toLocaleString()}</span></div>
+              <div className="resumen-item resumen-destacado"><span>Ventas del Día:</span><span className="monto positivo">${resumen.totalVentas.toLocaleString()}</span></div>
 
               {(() => {
                 const hoy = new Date();

@@ -56,6 +56,7 @@ function AppInner() {
   const [mostrarRetiros, setMostrarRetiros] = useState(false);
   const [mostrarCaja, setMostrarCaja] = useState(false);
   const [mostrarComparativa, setMostrarComparativa] = useState(false);
+  const [menuAdminAbierto, setMenuAdminAbierto] = useState(false);
   const [mostrarGestionProductos, setMostrarGestionProductos] = useState(false);
   const [mostrarGestionUsuarios, setMostrarGestionUsuarios] = useState(false);
   const [mostrarHistorialCajas, setMostrarHistorialCajas] = useState(false);
@@ -143,7 +144,7 @@ function AppInner() {
     setMostrarDashboard(false); setMostrarCaja(false); setMostrarRetiros(false);
     setMostrarGestionProductos(false); setMostrarGestionUsuarios(false);
     setMostrarHistorialCajas(false); setMostrarMiTurno(false); setMostrarHistorialTurnos(false);
-    setMostrarComparativa(false);
+    setMostrarComparativa(false); setMenuAdminAbierto(false);
   };
 
   // ── Efectos ────────────────────────────────────────────────────────────────
@@ -736,20 +737,49 @@ function AppInner() {
           Grido Laspiur
         </h1>
         <div className="header-actions" style={{ display: 'flex', gap: 0, alignItems: 'center', marginLeft: 'auto' }}>
-          <nav className="main-nav" style={{ display: 'flex', gap: '6px' }}>
+          <nav className="main-nav" style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+            <button className="nav-btn" onClick={() => { navClear(); setCategoriaActiva(null); }}>Productos</button>
             <button className={`nav-btn ${mostrarDashboard ? 'active' : ''}`} onClick={() => { navClear(); setMostrarDashboard(true); }}>Dashboard</button>
             <button className={`nav-btn ${mostrarCaja ? 'active' : ''}`} onClick={() => { navClear(); setMostrarCaja(true); }}>Caja</button>
-            <button className={`nav-btn ${mostrarRetiros ? 'active' : ''}`} onClick={() => { navClear(); setMostrarRetiros(true); }}>Retiros</button>
-            <button className="nav-btn" onClick={() => { navClear(); setCategoriaActiva(null); }}>Productos</button>
             <button className={`nav-btn ${mostrarMiTurno ? 'active' : ''}`} onClick={() => { navClear(); setMostrarMiTurno(true); cargarTurnoActivo(); }}>Mi Turno</button>
-            {isAdmin && <button className={`nav-btn ${mostrarGestionProductos ? 'active' : ''}`} onClick={() => { navClear(); setMostrarGestionProductos(true); cargarTodosProductos(); }}>Gestión</button>}
-            {isAdmin && <button className={`nav-btn ${mostrarGestionUsuarios ? 'active' : ''}`} onClick={() => { navClear(); setMostrarGestionUsuarios(true); cargarUsuarios(); }}>Usuarios</button>}
-            {isAdmin && <button className={`nav-btn ${mostrarHistorialCajas ? 'active' : ''}`} onClick={() => { navClear(); setMostrarHistorialCajas(true); cargarHistorialCajas(); }}>Cajas</button>}
-            {isAdmin && <button className={`nav-btn ${mostrarHistorialTurnos ? 'active' : ''}`} onClick={() => { navClear(); setMostrarHistorialTurnos(true); setTurnoDetalle(null); cargarHistorialTurnos(); }}>Turnos</button>}
-            {isAdmin && <button className={`nav-btn ${mostrarComparativa ? 'active' : ''}`} onClick={() => { navClear(); setMostrarComparativa(true); }}>Comparativa</button>}
+            {isAdmin && (
+              <div style={{ position: 'relative' }} onMouseLeave={() => setMenuAdminAbierto(false)}>
+                <button
+                  className={`nav-btn ${menuAdminAbierto || mostrarRetiros || mostrarGestionProductos || mostrarGestionUsuarios || mostrarHistorialCajas || mostrarHistorialTurnos || mostrarComparativa ? 'active' : ''}`}
+                  onClick={() => setMenuAdminAbierto(v => !v)}
+                >
+                  Admin ▾
+                </button>
+                {menuAdminAbierto && (
+                  <div style={{
+                    position: 'absolute', top: '100%', right: 0, background: 'white', borderRadius: '8px',
+                    boxShadow: '0 4px 20px rgba(0,0,0,0.15)', minWidth: '180px', zIndex: 1000,
+                    padding: '6px 0', marginTop: '4px',
+                  }}>
+                    {[
+                      { label: 'Retiros',           action: () => { navClear(); setMostrarRetiros(true); } },
+                      { label: 'Gestión Productos', action: () => { navClear(); setMostrarGestionProductos(true); cargarTodosProductos(); } },
+                      { label: 'Usuarios',          action: () => { navClear(); setMostrarGestionUsuarios(true); cargarUsuarios(); } },
+                      { label: 'Historial Cajas',   action: () => { navClear(); setMostrarHistorialCajas(true); cargarHistorialCajas(); } },
+                      { label: 'Historial Turnos',  action: () => { navClear(); setMostrarHistorialTurnos(true); setTurnoDetalle(null); cargarHistorialTurnos(); } },
+                      { label: 'Comparativa',       action: () => { navClear(); setMostrarComparativa(true); } },
+                    ].map(({ label, action }) => (
+                      <button key={label} onClick={() => { action(); setMenuAdminAbierto(false); }} style={{
+                        display: 'block', width: '100%', textAlign: 'left', padding: '10px 16px',
+                        background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px',
+                        color: '#2d3748', fontWeight: 500,
+                      }}
+                        onMouseEnter={e => e.target.style.background = '#f0f4ff'}
+                        onMouseLeave={e => e.target.style.background = 'none'}
+                      >{label}</button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </nav>
           <div className="header-right" style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-            <button className={`btn-open-caja ${cajaAbierta ? 'open' : ''}`} onClick={() => { navClear(); setMostrarCaja(true); }}>{cajaAbierta ? '💰 Caja Abierta' : '💰 Abrir Caja'}</button>
+            <button className={`btn-open-caja ${cajaAbierta ? 'open' : ''}`} onClick={() => { navClear(); setMostrarCaja(true); }}>{cajaAbierta ? 'Caja Abierta' : 'Abrir Caja'}</button>
             {user && (
               <>
                 <div className="usuario-info">{user.nombre}</div>

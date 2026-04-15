@@ -63,6 +63,7 @@ function DenomGrid({ prefix, gridClass, totalLabel, onTotalChange, storageKey, r
               type="text"
               inputMode="numeric"
               pattern="[0-9]*"
+              autoComplete="off"
               value={vals[key]}
               onChange={handleChange(key)}
               placeholder="0"
