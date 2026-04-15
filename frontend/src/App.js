@@ -269,7 +269,9 @@ function AppInner() {
       } catch (e) { console.error('Error al cerrar caja en BD:', e); }
     }
 
-    imprimirReporteCierre(resumen, ventasHoy, retiros, inicioCaja);
+    if (window.confirm('¿Querés imprimir el reporte de cierre?')) {
+      imprimirReporteCierre(resumen, ventasHoy, retiros, inicioCaja);
+    }
 
     // Enviar resumen por email al admin
     try {
