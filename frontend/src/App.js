@@ -97,6 +97,7 @@ function AppInner() {
 
   // ── Estado de retiros / gastos ─────────────────────────────────────────────
   const [retiros, setRetiros] = useState([]);
+  const [ingresos, setIngresos] = useState([]);
   const [nuevoRetiroMonto, setNuevoRetiroMonto] = useState('');
   const [nuevoRetiroDesc, setNuevoRetiroDesc] = useState('');
   const [retiroEditandoIdx, setRetiroEditandoIdx] = useState(null);
@@ -152,12 +153,18 @@ function AppInner() {
     try {
       const storedGastos = localStorage.getItem('gastos');
       if (storedGastos) setGastos(JSON.parse(storedGastos));
+      const storedIngresos = localStorage.getItem('ingresos');
+      if (storedIngresos) setIngresos(JSON.parse(storedIngresos));
     } catch (e) {}
   }, []);
 
   useEffect(() => {
     try { localStorage.setItem('gastos', JSON.stringify(gastos)); } catch (e) {}
-  }, [retiros, gastos]);
+  }, [gastos]);
+
+  useEffect(() => {
+    try { localStorage.setItem('ingresos', JSON.stringify(ingresos)); } catch (e) {}
+  }, [ingresos]);
 
   useEffect(() => {
     try {
@@ -251,7 +258,7 @@ function AppInner() {
   };
 
   const confirmarCierreCaja = async () => {
-    const resumen = calcularResumenCaja(inicioCaja, ventasDelDia, retiros, gastos, cierreTotalContado);
+    const resumen = calcularResumenCaja(inicioCaja, ventasDelDia, retiros, gastos, cierreTotalContado, ingresos);
     const tokenActual = localStorage.getItem('auth_token');
     const idCaja = cajaId || localStorage.getItem('cajaId');
     const hoy = new Date();
@@ -292,10 +299,11 @@ function AppInner() {
 
     setCajaAbierta(false); setMostrarCaja(false); setCajaId(null);
     setCierreKey(k => k + 1); setCierreTotalContado(0);
-    setVentasDelDia([]); setInicioCaja(null); setRetiros([]); setGastos([]);
+    setVentasDelDia([]); setInicioCaja(null); setRetiros([]); setGastos([]); setIngresos([]);
     localStorage.removeItem('cajaAbierta'); localStorage.removeItem('inicioCaja');
     localStorage.removeItem('cajaId'); localStorage.removeItem('retiros');
-    localStorage.removeItem('gastos'); localStorage.removeItem('cierre-denominaciones');
+    localStorage.removeItem('gastos'); localStorage.removeItem('ingresos');
+    localStorage.removeItem('cierre-denominaciones');
   };
 
   const cargarHistorialCajas = async () => {
@@ -647,10 +655,9 @@ function AppInner() {
   const guardarIngresoExtra = () => {
     const monto = parseFloat(ingresoMonto);
     if (!monto || monto <= 0) { alert('Ingrese un monto válido para el ingreso'); return; }
-    const nuevaVenta = { id: Date.now(), fecha: new Date().toISOString(), items: [], total: monto, pagos: [{ metodo: ingresoMetodo, monto }], descripcion: ingresoDesc || 'Ingreso extra', usuario: user?.nombre || null };
-    setVentasDelDia([...ventasDelDia, nuevaVenta]);
+    const nuevoIngreso = { id: Date.now(), fecha: new Date().toISOString(), monto, metodo: ingresoMetodo, descripcion: ingresoDesc || 'Ingreso extra' };
+    setIngresos([...ingresos, nuevoIngreso]);
     setIngresoMonto(''); setIngresoDesc(''); setIngresoMetodo('EFECTIVO');
-    alert(`Ingreso registrado: $${monto.toLocaleString()} (${ingresoMetodo})`);
   };
 
   // ── Carrito ────────────────────────────────────────────────────────────────
@@ -784,7 +791,7 @@ function AppInner() {
               <>
                 <div className="usuario-info">{user.nombre}</div>
                 <button className="btn-logout" onClick={() => {
-                  localStorage.removeItem('retiros'); localStorage.removeItem('gastos');
+                  localStorage.removeItem('retiros'); localStorage.removeItem('gastos'); localStorage.removeItem('ingresos');
                   cerrarTurno(); logout();
                 }}>Cerrar sesión</button>
               </>
@@ -806,7 +813,7 @@ function AppInner() {
           ingresoMetodo={ingresoMetodo} setIngresoMetodo={setIngresoMetodo}
           nuevoGastoMonto={nuevoGastoMonto} setNuevoGastoMonto={setNuevoGastoMonto}
           nuevoGastoDesc={nuevoGastoDesc} setNuevoGastoDesc={setNuevoGastoDesc}
-          retiros={retiros} gastos={gastos} retiroEditandoIdx={retiroEditandoIdx}
+          retiros={retiros} gastos={gastos} ingresos={ingresos} retiroEditandoIdx={retiroEditandoIdx}
           editandoMonto={editandoMonto} setEditandoMonto={setEditandoMonto}
           editandoDesc={editandoDesc} setEditandoDesc={setEditandoDesc}
           ventasDelDia={ventasDelDia}

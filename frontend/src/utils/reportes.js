@@ -123,7 +123,7 @@ export const generarReporteMensual = (ventasDelDia) => {
 
 // ── Caja ──────────────────────────────────────────────────────────────────────
 
-export const calcularResumenCaja = (inicioCaja, ventasDelDia, retiros, gastos, cierreTotalContado) => {
+export const calcularResumenCaja = (inicioCaja, ventasDelDia, retiros, gastos, cierreTotalContado, ingresos = []) => {
   const montoInicial = inicioCaja ? inicioCaja.montoInicial : 0;
   const hoy = new Date();
   const fechaHoy = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`;
@@ -136,8 +136,10 @@ export const calcularResumenCaja = (inicioCaja, ventasDelDia, retiros, gastos, c
   }, 0);
   const retirosSum = retiros.reduce((s, r) => s + (parseFloat(r.monto) || 0), 0);
   const gastosSum = gastos.reduce((s, g) => s + (parseFloat(g.monto) || 0), 0);
-  const totalEsperado = montoInicial + totalVentas - retirosSum - gastosSum;
+  const ingresosSum = ingresos.reduce((s, i) => s + (parseFloat(i.monto) || 0), 0);
+  const totalVentasConIngresos = totalVentas + ingresosSum;
+  const totalEsperado = montoInicial + totalVentasConIngresos - retirosSum - gastosSum;
   const totalReal = cierreTotalContado;
   const diferencia = totalReal - totalEsperado;
-  return { montoInicial, totalVentas, retiros: retirosSum, gastos: gastosSum, totalEsperado, totalReal, diferencia };
+  return { montoInicial, totalVentas: totalVentasConIngresos, retiros: retirosSum, gastos: gastosSum, ingresos: ingresosSum, totalEsperado, totalReal, diferencia };
 };
