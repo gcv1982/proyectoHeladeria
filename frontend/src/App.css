@@ -663,7 +663,7 @@
 }
 
 .retirar-form input[type="number"] {
-  width: 85px;
+  width: 80px;
   flex-shrink: 0;
 }
 
