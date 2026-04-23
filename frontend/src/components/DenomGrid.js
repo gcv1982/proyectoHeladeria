@@ -76,7 +76,7 @@ function DenomGrid({ prefix, gridClass, totalLabel, onTotalChange, storageKey, r
         className="total-inicio"
         style={gridClass === 'denominaciones-grid-cierre' ? { marginTop: '8px', padding: '6px 12px' } : {}}
       >
-        <h3>{totalLabel}:</h3><h2>${total.toLocaleString()}</h2>
+        <span className="total-label">{totalLabel}:</span><span className="total-monto">${total.toLocaleString()}</span>
       </div>
     </>
   );

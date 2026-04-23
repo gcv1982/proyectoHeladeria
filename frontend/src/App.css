@@ -823,11 +823,12 @@
   background: #dc3545;
   color: white;
   border: none;
-  width: 28px;
-  height: 28px;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
   cursor: pointer;
   font-weight: 700;
+  font-size: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1211,7 +1212,7 @@
 .resumen-item span:first-child {
   font-weight: 600;
   color: #374151;
-  font-size: 14px;
+  font-size: 12px;
 }
 
 .monto {
@@ -1392,7 +1393,7 @@
 }
 
 .modal-total span:first-child {
-  font-size: 18px;
+  font-size: 14px;
   font-weight: 500;
 }
 
@@ -1933,7 +1934,7 @@
 .total-inicio {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: baseline;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   padding: 10px 14px;
   border-radius: 10px;
@@ -1941,15 +1942,13 @@
   margin-bottom: 12px;
 }
 
-.total-inicio h3 {
-  margin: 0;
-  font-size: 13px;
+.total-inicio .total-label {
+  font-size: 15px;
   opacity: 0.95;
   font-weight: 600;
 }
 
-.total-inicio h2 {
-  margin: 0;
+.total-inicio .total-monto {
   font-size: 20px;
   font-weight: 700;
   color: white;
@@ -2041,8 +2040,8 @@
 
 .cierre-conteo h3 {
   color: #2d3748;
-  margin: 0 0 6px 0;
-  font-size: 13px;
+  margin: 0 0 18px 0;
+  font-size: 16px;
 }
 
 .caja-container {
@@ -2069,18 +2068,21 @@
   min-height: unset;
 }
 
-.denominaciones-grid-cierre .denominacion-item label { flex: 1; font-size: 12px; }
-.denominaciones-grid-cierre .denominacion-item input { flex: 0 0 60px; padding: 3px 4px; font-size: 12px; width: 60px; min-width: 0; text-align: center; margin: 0 8px; }
-.denominaciones-grid-cierre .denominacion-item .subtotal { flex: 0 0 80px; text-align: right; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.denominaciones-grid-cierre .denominacion-item label { flex: 1; font-size: 15px; }
+.denominaciones-grid-cierre .denominacion-item input { flex: 0 0 60px; padding: 3px 4px; font-size: 14px; width: 60px; min-width: 0; text-align: center; margin: 0 8px; }
+.denominaciones-grid-cierre .denominacion-item .subtotal { flex: 0 0 80px; text-align: right; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 .cierre-resumen { padding: 6px; font-size: 11px; }
-.cierre-resumen h3 { font-size: 13px; margin: 0 0 6px 0 !important; }
+.cierre-resumen h3 { font-size: 12px; margin: 0 0 6px 0 !important; }
 .cierre-caja .resumen-item { padding: 1px 4px; font-size: 13px; line-height: 1.2; min-height: unset; }
-.cierre-caja .resumen-item span:first-child { font-size: 13px; }
+.cierre-caja .resumen-item span:first-child { font-size: 12px; }
 .cierre-caja .monto { font-size: 12px; }
 .cierre-caja .resumen-item.resumen-destacado { font-size: 14px !important; }
 .cierre-caja .resumen-item.resumen-destacado span { font-size: 14px !important; }
 .cierre-caja .resumen-item.resumen-destacado .monto { font-size: 14px !important; }
+.cierre-caja .resumen-item.destacado { font-size: 14px !important; }
+.cierre-caja .resumen-item.destacado span { font-size: 14px !important; }
+.cierre-caja .resumen-item.destacado .monto { font-size: 14px !important; }
 .cierre-caja .resumen-item.final {
   font-size: 15px !important;
   padding: 8px 10px !important;
@@ -2131,8 +2133,8 @@
   .denominacion-item { padding: 6px; min-height: 36px; gap: 6px; }
   .denominacion-item label { flex: 0 0 56px; font-size: 12px; }
   .denominacion-item input { flex: 0 0 44px; font-size: 12px; padding: 6px; }
-  .denominacion-item .subtotal { font-size: 12px; }
-  .total-inicio h2 { font-size: 16px; }
+  .denominacion-item .subtotal { font-size: 15px; }
+  .total-inicio .total-monto { font-size: 16px; }
 }
 
 /* Resumen final: colores claros y contrastados */
@@ -2197,6 +2199,6 @@
   .denominacion-item label { flex: 0 0 60px; font-size: 12px; }
   .denominacion-item input { flex: 0 0 48px; font-size: 12px; padding: 6px; }
   .denominacion-item .subtotal { font-size: 12px; }
-  .total-inicio h2 { font-size: 18px; }
+  .total-inicio .total-monto { font-size: 18px; }
   .btn-cancelar-caja { flex: 1 1 auto; }
 }

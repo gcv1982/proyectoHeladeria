@@ -42,7 +42,7 @@ export default function CajaView({
                 key={cierreKey}
                 prefix="cierre"
                 gridClass="denominaciones-grid-cierre"
-                totalLabel="Total Contado"
+                totalLabel="Dinero en Caja"
                 onTotalChange={setCierreTotalContado}
                 storageKey="cierre-denominaciones"
               />
@@ -141,7 +141,10 @@ export default function CajaView({
                     {gastos.map((g, idx) => (
                       <div key={idx} className="resumen-item retiro-item">
                         <span>{g.descripcion} <small className="retiro-fecha">({new Date(g.fecha).toLocaleTimeString()})</small> <small style={{ color: '#718096' }}>{g.metodo}</small></span>
-                        <span className="monto negativo">${g.monto.toLocaleString()} <button className="btn-eliminar-retiro" onClick={() => eliminarGasto(idx)}>✕</button></span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span className="monto negativo">${g.monto.toLocaleString()}</span>
+                          <button className="btn-eliminar-retiro" onClick={() => eliminarGasto(idx)}>✕</button>
+                        </div>
                       </div>
                     ))}
                     <div className="resumen-item"><span>Total Gastos:</span><span className="monto negativo">${resumen.gastos.toLocaleString()}</span></div>
