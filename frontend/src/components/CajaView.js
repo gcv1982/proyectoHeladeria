@@ -8,7 +8,7 @@ export default function CajaView({
   denomInicioRef, denomCierreRef, cierreKey, setCierreTotalContado, cierreTotalContado,
   nuevoRetiroMonto, setNuevoRetiroMonto, nuevoRetiroDesc, setNuevoRetiroDesc,
   ingresoMonto, setIngresoMonto, ingresoDesc, setIngresoDesc, ingresoMetodo, setIngresoMetodo,
-  nuevoGastoMonto, setNuevoGastoMonto, nuevoGastoDesc, setNuevoGastoDesc,
+  nuevoGastoMonto, setNuevoGastoMonto, nuevoGastoDesc, setNuevoGastoDesc, nuevoGastoMetodo, setNuevoGastoMetodo,
   retiros, gastos, ingresos, retiroEditandoIdx,
   editandoMonto, setEditandoMonto, editandoDesc, setEditandoDesc,
   ventasDelDia,
@@ -72,59 +72,56 @@ export default function CajaView({
                 ) : null;
               })()}
 
-              {/* Ingresos extra — formulario */}
-              <div className="retirar-form" style={{ marginTop: 10 }}>
-                <input name="ingreso-monto" type="number" min="0" value={ingresoMonto} onChange={(e) => setIngresoMonto(e.target.value)} placeholder="Monto ingreso" />
-                <input name="ingreso-desc" type="text" value={ingresoDesc} onChange={(e) => setIngresoDesc(e.target.value)} placeholder="Descripción (opcional)" />
-                <select name="ingreso-metodo" className="select-metodo" value={ingresoMetodo} onChange={(e) => setIngresoMetodo(e.target.value)}>
-                  <option value="EFECTIVO">EFECTIVO</option>
-                  <option value="TRANSFERENCIA">TRANSFERENCIA</option>
-                  <option value="DÉBITO">DÉBITO</option>
-                </select>
-                <button className="btn-retiro" onClick={guardarIngresoExtra}>Registrar Ingreso</button>
+              {/* Ingresos */}
+              <div className="lista-gastos">
+                <h4 style={{ margin: '0 0 8px 0' }}>💵 Ingresos Extra</h4>
+                <div className="retirar-form" style={{ marginBottom: '8px' }}>
+                  <input name="ingreso-monto" type="number" min="0" value={ingresoMonto} onChange={(e) => setIngresoMonto(e.target.value)} placeholder="Monto ingreso" />
+                  <input name="ingreso-desc" type="text" value={ingresoDesc} onChange={(e) => setIngresoDesc(e.target.value)} placeholder="Descripción (opcional)" />
+                  <select name="ingreso-metodo" className="select-metodo" value={ingresoMetodo} onChange={(e) => setIngresoMetodo(e.target.value)}>
+                    <option value="EFECTIVO">EFECTIVO</option>
+                    <option value="TRANSFERENCIA">TRANSFERENCIA</option>
+                    <option value="DÉBITO">DÉBITO</option>
+                  </select>
+                  <button className="btn-retiro" onClick={guardarIngresoExtra}>Registrar Ingreso</button>
+                </div>
+                {ingresos.length > 0 ? (
+                  <>
+                    {ingresos.map((ing, idx) => (
+                      <div key={idx} className="resumen-item retiro-item">
+                        <span>{ing.descripcion} <small className="retiro-fecha">({new Date(ing.fecha).toLocaleTimeString()})</small> <small style={{ color: '#718096' }}>{ing.metodo}</small></span>
+                        <span className="monto positivo">${ing.monto.toLocaleString()}</span>
+                      </div>
+                    ))}
+                    <div className="resumen-item"><span>Total Ingresos:</span><span className="monto positivo">${resumen.ingresos.toLocaleString()}</span></div>
+                  </>
+                ) : (
+                  <div className="resumen-item"><span>Ingresos:</span><span className="monto positivo">$0</span></div>
+                )}
               </div>
 
-              {/* Lista de ingresos extra */}
-              {ingresos.length > 0 && (
-                <div className="lista-retiros">
-                  <div className="resumen-item"><span style={{ fontWeight: 600 }}>Ingresos registrados:</span></div>
-                  {ingresos.map((ing, idx) => (
-                    <div key={idx} className="resumen-item retiro-item">
-                      <span>{ing.descripcion} <small className="retiro-fecha">({new Date(ing.fecha).toLocaleTimeString()})</small> <small style={{ color: '#718096' }}>{ing.metodo}</small></span>
-                      <span className="monto positivo">${ing.monto.toLocaleString()}</span>
-                    </div>
-                  ))}
-                  <div className="resumen-item"><span>Total Ingresos:</span><span className="monto positivo">${resumen.ingresos.toLocaleString()}</span></div>
-                </div>
-              )}
-
-              {/* Retiros — formulario solo para no admin, lista para todos */}
-              {!isAdmin && (
-                <div className="retirar-form" style={{ marginTop: 10 }}>
+              {/* Retiros */}
+              <div className="lista-gastos">
+                <h4 style={{ margin: '0 0 8px 0' }}>🔄 Retiros</h4>
+                <div className="retirar-form" style={{ marginBottom: '8px' }}>
                   <input name="retiro-monto" type="number" min="1" value={nuevoRetiroMonto} onChange={(e) => setNuevoRetiroMonto(e.target.value)} placeholder="Monto retiro" />
                   <input name="retiro-desc" type="text" value={nuevoRetiroDesc} onChange={(e) => setNuevoRetiroDesc(e.target.value)} placeholder="Concepto (opcional)" />
                   <button className="btn-retiro" onClick={agregarRetiro}>Registrar Retiro</button>
                 </div>
-              )}
-              {!isAdmin ? (
-                <div className="lista-retiros">
-                  {retiros.length > 0 ? (
-                    <>
-                      {retiros.map((r, idx) => (
-                        <div key={idx} className="resumen-item retiro-item">
-                          <span>{r.descripcion} <small className="retiro-fecha">({new Date(r.fecha).toLocaleTimeString()})</small></span>
-                          <span className="monto negativo">${r.monto.toLocaleString()}</span>
-                        </div>
-                      ))}
-                      <div className="resumen-item"><span>Total Retiros:</span><span className="monto negativo">-${resumen.retiros.toLocaleString()}</span></div>
-                    </>
-                  ) : (
-                    <div className="resumen-item"><span>Retiros:</span><span className="monto negativo">$0</span></div>
-                  )}
-                </div>
-              ) : (
-                <div className="resumen-item"><span>Retiros:</span><span className="monto negativo">-${resumen.retiros.toLocaleString()}</span></div>
-              )}
+                {retiros.length > 0 ? (
+                  <>
+                    {retiros.map((r, idx) => (
+                      <div key={idx} className="resumen-item retiro-item">
+                        <span>{r.descripcion} <small className="retiro-fecha">({new Date(r.fecha).toLocaleTimeString()})</small></span>
+                        <span className="monto negativo">${r.monto.toLocaleString()}</span>
+                      </div>
+                    ))}
+                    <div className="resumen-item"><span>Total Retiros:</span><span className="monto negativo">-${resumen.retiros.toLocaleString()}</span></div>
+                  </>
+                ) : (
+                  <div className="resumen-item"><span>Retiros:</span><span className="monto negativo">$0</span></div>
+                )}
+              </div>
 
               {/* Gastos */}
               <div className="lista-gastos">
@@ -132,13 +129,18 @@ export default function CajaView({
                 <div className="retirar-form" style={{ marginBottom: '8px' }}>
                   <input name="gasto-monto" type="number" min="0" value={nuevoGastoMonto} onChange={(e) => setNuevoGastoMonto(e.target.value)} placeholder="Monto gasto" />
                   <input name="gasto-desc" type="text" value={nuevoGastoDesc} onChange={(e) => setNuevoGastoDesc(e.target.value)} placeholder="Descripción (opcional)" />
+                  <select name="gasto-metodo" className="select-metodo" value={nuevoGastoMetodo} onChange={(e) => setNuevoGastoMetodo(e.target.value)}>
+                    <option value="EFECTIVO">EFECTIVO</option>
+                    <option value="TRANSFERENCIA">TRANSFERENCIA</option>
+                    <option value="DÉBITO">DÉBITO</option>
+                  </select>
                   <button className="btn-retiro" onClick={agregarGasto}>Agregar Gasto</button>
                 </div>
                 {gastos.length > 0 ? (
                   <>
                     {gastos.map((g, idx) => (
                       <div key={idx} className="resumen-item retiro-item">
-                        <span>{g.descripcion} <small className="retiro-fecha">({new Date(g.fecha).toLocaleTimeString()})</small></span>
+                        <span>{g.descripcion} <small className="retiro-fecha">({new Date(g.fecha).toLocaleTimeString()})</small> <small style={{ color: '#718096' }}>{g.metodo}</small></span>
                         <span className="monto negativo">${g.monto.toLocaleString()} <button className="btn-eliminar-retiro" onClick={() => eliminarGasto(idx)}>✕</button></span>
                       </div>
                     ))}

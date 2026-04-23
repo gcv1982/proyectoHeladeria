@@ -111,6 +111,7 @@ function AppInner() {
   const [gastos, setGastos] = useState([]);
   const [nuevoGastoMonto, setNuevoGastoMonto] = useState('');
   const [nuevoGastoDesc, setNuevoGastoDesc] = useState('');
+  const [nuevoGastoMetodo, setNuevoGastoMetodo] = useState('EFECTIVO');
 
   // ── Estado del dashboard ───────────────────────────────────────────────────
   const [periodoSeleccionado, setPeriodoSeleccionado] = useState('HOY');
@@ -640,9 +641,9 @@ function AppInner() {
   const agregarGasto = () => {
     const monto = parseFloat(nuevoGastoMonto);
     if (!monto || monto <= 0) { alert('Ingrese un monto válido para el gasto'); return; }
-    const nuevo = { monto, descripcion: nuevoGastoDesc || 'Gasto', fecha: new Date().toISOString(), usuario: user?.nombre || null };
+    const nuevo = { monto, descripcion: nuevoGastoDesc || 'Gasto', metodo: nuevoGastoMetodo, fecha: new Date().toISOString(), usuario: user?.nombre || null };
     setGastos([...gastos, nuevo]);
-    setNuevoGastoMonto(''); setNuevoGastoDesc('');
+    setNuevoGastoMonto(''); setNuevoGastoDesc(''); setNuevoGastoMetodo('EFECTIVO');
     alert(`Gasto registrado: $${monto.toLocaleString()}`);
   };
 
@@ -813,6 +814,7 @@ function AppInner() {
           ingresoMetodo={ingresoMetodo} setIngresoMetodo={setIngresoMetodo}
           nuevoGastoMonto={nuevoGastoMonto} setNuevoGastoMonto={setNuevoGastoMonto}
           nuevoGastoDesc={nuevoGastoDesc} setNuevoGastoDesc={setNuevoGastoDesc}
+          nuevoGastoMetodo={nuevoGastoMetodo} setNuevoGastoMetodo={setNuevoGastoMetodo}
           retiros={retiros} gastos={gastos} ingresos={ingresos} retiroEditandoIdx={retiroEditandoIdx}
           editandoMonto={editandoMonto} setEditandoMonto={setEditandoMonto}
           editandoDesc={editandoDesc} setEditandoDesc={setEditandoDesc}

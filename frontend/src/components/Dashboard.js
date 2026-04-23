@@ -9,6 +9,40 @@ import {
   generarReporteMensual,
 } from '../utils/reportes';
 
+function generarResumenDiario(ventasDelDia) {
+  const hoy = new Date();
+  const fechaHoy = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`;
+  const ayer = new Date(hoy); ayer.setDate(hoy.getDate() - 1);
+  const fechaAyer = `${ayer.getFullYear()}-${String(ayer.getMonth() + 1).padStart(2, '0')}-${String(ayer.getDate()).padStart(2, '0')}`;
+
+  const ventasHoy = ventasDelDia.filter(v => fechaLocal(v.fecha) === fechaHoy);
+  const ventasAyer = ventasDelDia.filter(v => fechaLocal(v.fecha) === fechaAyer);
+
+  const totalHoy = ventasHoy.reduce((s, v) => s + (parseFloat(v.total) || 0), 0);
+  const totalAyer = ventasAyer.reduce((s, v) => s + (parseFloat(v.total) || 0), 0);
+
+  const productosMap = {};
+  ventasHoy.forEach(v => {
+    (v.items || []).forEach(it => {
+      const k = it.nombre || 'Desconocido';
+      productosMap[k] = (productosMap[k] || 0) + (parseInt(it.cantidad) || 0);
+    });
+  });
+  const topProducto = Object.entries(productosMap).sort((a, b) => b[1] - a[1])[0];
+
+  if (ventasHoy.length === 0) return null;
+
+  let mensaje = `Hoy realizaste ${ventasHoy.length} venta${ventasHoy.length !== 1 ? 's' : ''} por $${totalHoy.toLocaleString()}.`;
+  if (topProducto) mensaje += ` Producto más vendido: ${topProducto[0]} (${topProducto[1]} u.).`;
+  if (totalAyer > 0) {
+    const diff = Math.round(((totalHoy - totalAyer) / totalAyer) * 100);
+    if (diff > 0) mensaje += ` Vendiste un ${diff}% más que ayer.`;
+    else if (diff < 0) mensaje += ` Vendiste un ${Math.abs(diff)}% menos que ayer.`;
+    else mensaje += ` Igual que ayer.`;
+  }
+  return mensaje;
+}
+
 export default function Dashboard({
   ventasDelDia, periodoSeleccionado, setPeriodoSeleccionado,
   detalleDashboard, setDetalleDashboard,
@@ -20,6 +54,7 @@ export default function Dashboard({
 
   const ventasFiltradas = filtrarVentasPorPeriodo(ventasDelDia, periodoSeleccionado);
   const metricas = calcularMetricas(ventasDelDia, periodoSeleccionado);
+  const resumenDiario = generarResumenDiario(ventasDelDia);
 
   const confirmarEliminar = () => {
     eliminarVenta(ventaAEliminar.id);
@@ -30,6 +65,17 @@ export default function Dashboard({
     <>
     <div className="dashboard-container">
       <h2 style={{ marginBottom: '16px' }}>📊 Dashboard de Ventas</h2>
+
+      {resumenDiario && (
+        <div style={{
+          background: 'linear-gradient(135deg, #1a1a6e 0%, #2d2d9e 100%)',
+          color: 'white', borderRadius: '10px', padding: '14px 18px',
+          marginBottom: '16px', fontSize: '14px', lineHeight: '1.5',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
+        }}>
+          💡 {resumenDiario}
+        </div>
+      )}
 
       {/* Selector de período */}
       <div className="periodo-selector">
