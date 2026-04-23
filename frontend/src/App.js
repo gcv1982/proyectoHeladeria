@@ -97,7 +97,9 @@ function AppInner() {
 
   // ── Estado de retiros / gastos ─────────────────────────────────────────────
   const [retiros, setRetiros] = useState([]);
-  const [ingresos, setIngresos] = useState([]);
+  const [ingresos, setIngresos] = useState(() => {
+    try { const s = localStorage.getItem('ingresos'); return s ? JSON.parse(s) : []; } catch (e) { return []; }
+  });
   const [nuevoRetiroMonto, setNuevoRetiroMonto] = useState('');
   const [nuevoRetiroDesc, setNuevoRetiroDesc] = useState('');
   const [retiroEditandoIdx, setRetiroEditandoIdx] = useState(null);
@@ -108,7 +110,9 @@ function AppInner() {
   const [ingresoDesc, setIngresoDesc] = useState('');
   const [ingresoMetodo, setIngresoMetodo] = useState('EFECTIVO');
 
-  const [gastos, setGastos] = useState([]);
+  const [gastos, setGastos] = useState(() => {
+    try { const s = localStorage.getItem('gastos'); return s ? JSON.parse(s) : []; } catch (e) { return []; }
+  });
   const [nuevoGastoMonto, setNuevoGastoMonto] = useState('');
   const [nuevoGastoDesc, setNuevoGastoDesc] = useState('');
   const [nuevoGastoMetodo, setNuevoGastoMetodo] = useState('EFECTIVO');
@@ -150,14 +154,6 @@ function AppInner() {
   };
 
   // ── Efectos ────────────────────────────────────────────────────────────────
-  useEffect(() => {
-    try {
-      const storedGastos = localStorage.getItem('gastos');
-      if (storedGastos) setGastos(JSON.parse(storedGastos));
-      const storedIngresos = localStorage.getItem('ingresos');
-      if (storedIngresos) setIngresos(JSON.parse(storedIngresos));
-    } catch (e) {}
-  }, []);
 
   useEffect(() => {
     try { localStorage.setItem('gastos', JSON.stringify(gastos)); } catch (e) {}
@@ -792,7 +788,6 @@ function AppInner() {
               <>
                 <div className="usuario-info">{user.nombre}</div>
                 <button className="btn-logout" onClick={() => {
-                  localStorage.removeItem('retiros'); localStorage.removeItem('gastos'); localStorage.removeItem('ingresos');
                   cerrarTurno(); logout();
                 }}>Cerrar sesión</button>
               </>
