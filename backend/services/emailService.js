@@ -21,7 +21,7 @@ const crearTransporter = () => {
 const formatearPesos = (monto) =>
   `$${Number(monto || 0).toLocaleString('es-AR')}`;
 
-const enviarResumenCierre = async ({ fecha, resumen, ventasPorMedio, retiros, gastos }) => {
+const enviarResumenCierre = async ({ fecha, resumen, ventasPorMedio, retiros, gastos, nombreUsuario, notaCierre }) => {
   const transporter = crearTransporter();
 
   const fechaFormateada = new Date(fecha).toLocaleDateString('es-AR', {
@@ -131,8 +131,18 @@ const enviarResumenCierre = async ({ fecha, resumen, ventasPorMedio, retiros, ga
 
     </div>
 
+    ${notaCierre ? `
+      <!-- Nota de cierre -->
+      <div style="padding:0 32px 24px;">
+        <h3 style="margin:0 0 8px;font-size:15px;color:#2d3748;">📝 Nota de cierre</h3>
+        <div style="background:#fffbeb;border:1px solid #f6e05e;border-radius:8px;padding:12px 16px;font-size:14px;color:#744210;">
+          ${notaCierre}
+        </div>
+      </div>` : ''}
+
     <!-- Footer -->
     <div style="background:#f8f9ff;padding:16px 32px;text-align:center;border-top:1px solid #e2e8f0;">
+      <p style="margin:0 0 4px;font-size:13px;color:#4a5568;">Cierre realizado por: <strong>${nombreUsuario}</strong></p>
       <p style="margin:0;font-size:12px;color:#a0aec0;">Heladería POS — Cierre automático del sistema</p>
     </div>
   </div>

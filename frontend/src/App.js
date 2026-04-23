@@ -92,6 +92,9 @@ function AppInner() {
     return 0;
   });
 
+  const [notaCierre, setNotaCierre] = useState('');
+  const [mostrarModalNota, setMostrarModalNota] = useState(false);
+
   const denomInicioRef = useRef();
   const denomCierreRef = useRef();
 
@@ -254,7 +257,12 @@ function AppInner() {
     alert(`Caja abierta exitosamente\nMonto inicial: $${total.toLocaleString()}`);
   };
 
-  const confirmarCierreCaja = async () => {
+  const confirmarCierreCaja = () => {
+    setMostrarModalNota(true);
+  };
+
+  const ejecutarCierreCaja = async () => {
+    setMostrarModalNota(false);
     const resumen = calcularResumenCaja(inicioCaja, ventasDelDia, retiros, gastos, cierreTotalContado, ingresos);
     const tokenActual = localStorage.getItem('auth_token');
     const idCaja = cajaId || localStorage.getItem('cajaId');
@@ -290,12 +298,14 @@ function AppInner() {
           ventasPorMedio: medios.lista,
           retiros,
           gastos,
+          nombreUsuario: user?.nombre || 'Desconocido',
+          notaCierre: notaCierre || '',
         }),
       });
     } catch (e) { console.error('Error al enviar email de cierre:', e); }
 
     setCajaAbierta(false); setMostrarCaja(false); setCajaId(null);
-    setCierreKey(k => k + 1); setCierreTotalContado(0);
+    setCierreKey(k => k + 1); setCierreTotalContado(0); setNotaCierre('');
     setVentasDelDia([]); setInicioCaja(null); setRetiros([]); setGastos([]); setIngresos([]);
     localStorage.removeItem('cajaAbierta'); localStorage.removeItem('inicioCaja');
     localStorage.removeItem('cajaId'); localStorage.removeItem('retiros');
@@ -820,6 +830,7 @@ function AppInner() {
           guardarIngresoExtra={guardarIngresoExtra}
           agregarGasto={agregarGasto} eliminarGasto={eliminarGasto}
           exportarRetirosCSV={exportarRetirosCSV}
+          notaCierre={notaCierre} setNotaCierre={setNotaCierre}
           confirmarInicioCaja={confirmarInicioCaja} confirmarCierreCaja={confirmarCierreCaja}
           setMostrarCaja={setMostrarCaja}
         />
@@ -906,6 +917,43 @@ function AppInner() {
           productoAgregarEdit={productoAgregarEdit} setProductoAgregarEdit={setProductoAgregarEdit}
           guardarEdicionVenta={guardarEdicionVenta}
         />
+      )}
+
+      {mostrarModalNota && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 3000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
+          <div style={{ background: 'white', borderRadius: '12px', padding: '28px 24px', width: '100%', maxWidth: '420px', boxShadow: '0 8px 32px rgba(0,0,0,0.25)' }}>
+            <div style={{ fontSize: '36px', textAlign: 'center', marginBottom: '12px' }}>📝</div>
+            <h3 style={{ margin: '0 0 8px', color: '#2d3748', textAlign: 'center' }}>Nota de cierre</h3>
+            <p style={{ margin: '0 0 16px', color: '#718096', textAlign: 'center', fontSize: '14px' }}>¿Querés dejar una nota antes de cerrar la caja?</p>
+            <textarea
+              value={notaCierre}
+              onChange={(e) => setNotaCierre(e.target.value)}
+              placeholder="Escribí tu mensaje acá (opcional)..."
+              style={{ width: '100%', padding: '10px', fontSize: '14px', borderRadius: '8px', border: '1px solid #ddd', resize: 'vertical', minHeight: '80px', fontFamily: 'inherit', boxSizing: 'border-box', marginBottom: '16px' }}
+              autoFocus
+            />
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+              <button
+                onClick={() => { setNotaCierre(''); setMostrarModalNota(false); }}
+                style={{ background: '#e2e8f0', color: '#4a5568', border: 'none', borderRadius: '8px', padding: '10px 20px', cursor: 'pointer', fontWeight: 600, fontSize: '14px' }}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => { setNotaCierre(''); ejecutarCierreCaja(); }}
+                style={{ background: '#718096', color: 'white', border: 'none', borderRadius: '8px', padding: '10px 20px', cursor: 'pointer', fontWeight: 600, fontSize: '14px' }}
+              >
+                Sin nota
+              </button>
+              <button
+                onClick={ejecutarCierreCaja}
+                style={{ background: 'linear-gradient(135deg,#667eea,#764ba2)', color: 'white', border: 'none', borderRadius: '8px', padding: '10px 20px', cursor: 'pointer', fontWeight: 600, fontSize: '14px' }}
+              >
+                Confirmar cierre
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
