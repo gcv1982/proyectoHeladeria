@@ -137,8 +137,10 @@ export const calcularResumenCaja = (inicioCaja, ventasDelDia, retiros, gastos, c
   const retirosSum = retiros.reduce((s, r) => s + (parseFloat(r.monto) || 0), 0);
   const gastosSum = gastos.reduce((s, g) => s + (parseFloat(g.monto) || 0), 0);
   const ingresosSum = ingresos.reduce((s, i) => s + (parseFloat(i.monto) || 0), 0);
-  const totalVentasConIngresos = totalVentas + ingresosSum;
-  const totalEsperado = montoInicial + totalVentasConIngresos - retirosSum - gastosSum;
+  const gastosEfectivo = gastos.filter(g => !g.metodo || g.metodo === 'EFECTIVO').reduce((s, g) => s + (parseFloat(g.monto) || 0), 0);
+  const ingresosEfectivo = ingresos.filter(i => !i.metodo || i.metodo === 'EFECTIVO').reduce((s, i) => s + (parseFloat(i.monto) || 0), 0);
+  const totalVentasConIngresos = totalVentas + ingresosEfectivo;
+  const totalEsperado = montoInicial + totalVentasConIngresos - retirosSum - gastosEfectivo;
   const totalReal = cierreTotalContado;
   const diferencia = totalReal - totalEsperado;
   return { montoInicial, totalVentas: totalVentasConIngresos, retiros: retirosSum, gastos: gastosSum, ingresos: ingresosSum, totalEsperado, totalReal, diferencia };
