@@ -258,6 +258,7 @@ function AppInner() {
   };
 
   const confirmarCierreCaja = () => {
+    setNotaCierre('Inicio de caja: $');
     setMostrarModalNota(true);
   };
 
@@ -311,6 +312,7 @@ function AppInner() {
     localStorage.removeItem('cajaId'); localStorage.removeItem('retiros');
     localStorage.removeItem('gastos'); localStorage.removeItem('ingresos');
     localStorage.removeItem('cierre-denominaciones');
+    cerrarTurno(); logout();
   };
 
   const cargarHistorialCajas = async () => {
@@ -932,22 +934,22 @@ function AppInner() {
               style={{ width: '100%', padding: '10px', fontSize: '14px', borderRadius: '8px', border: '1px solid #ddd', resize: 'vertical', minHeight: '80px', fontFamily: 'inherit', boxSizing: 'border-box', marginBottom: '16px' }}
               autoFocus
             />
-            <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
               <button
                 onClick={() => { setNotaCierre(''); setMostrarModalNota(false); }}
-                style={{ background: '#e2e8f0', color: '#4a5568', border: 'none', borderRadius: '8px', padding: '10px 20px', cursor: 'pointer', fontWeight: 600, fontSize: '14px' }}
+                style={{ background: '#e2e8f0', color: '#4a5568', border: 'none', borderRadius: '6px', padding: '7px 14px', cursor: 'pointer', fontWeight: 600, fontSize: '12px' }}
               >
                 Cancelar
               </button>
               <button
                 onClick={() => { setNotaCierre(''); ejecutarCierreCaja(); }}
-                style={{ background: '#718096', color: 'white', border: 'none', borderRadius: '8px', padding: '10px 20px', cursor: 'pointer', fontWeight: 600, fontSize: '14px' }}
+                style={{ background: '#718096', color: 'white', border: 'none', borderRadius: '6px', padding: '7px 14px', cursor: 'pointer', fontWeight: 600, fontSize: '12px' }}
               >
                 Sin nota
               </button>
               <button
                 onClick={ejecutarCierreCaja}
-                style={{ background: 'linear-gradient(135deg,#667eea,#764ba2)', color: 'white', border: 'none', borderRadius: '8px', padding: '10px 20px', cursor: 'pointer', fontWeight: 600, fontSize: '14px' }}
+                style={{ background: 'linear-gradient(135deg,#667eea,#764ba2)', color: 'white', border: 'none', borderRadius: '6px', padding: '7px 14px', cursor: 'pointer', fontWeight: 600, fontSize: '12px' }}
               >
                 Confirmar cierre
               </button>

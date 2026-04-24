@@ -89,8 +89,8 @@ const { enviarResumenCierre } = require('./services/emailService');
 
 router.post('/email/resumen-cierre', verificarToken, async (req, res) => {
   try {
-    const { fecha, resumen, ventasPorMedio, retiros, gastos } = req.body;
-    await enviarResumenCierre({ fecha, resumen, ventasPorMedio, retiros, gastos });
+    const { fecha, resumen, ventasPorMedio, retiros, gastos, nombreUsuario, notaCierre } = req.body;
+    await enviarResumenCierre({ fecha, resumen, ventasPorMedio, retiros, gastos, nombreUsuario, notaCierre });
     res.json({ success: true });
   } catch (error) {
     console.error('Error al enviar email:', error);
