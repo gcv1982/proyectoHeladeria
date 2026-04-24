@@ -89,34 +89,36 @@ export default function POSView({
           <>
             <button className="btn-volver" onClick={() => setCategoriaActiva(null)}>← VOLVER A CATEGORÍAS</button>
             <h3>{categoriaActiva}</h3>
-            <div className="productos-grid">
-              {categoriaActiva === 'PALITOS' ? (() => {
-                const palitos = productos.filter(p => p.categoria === 'PALITOS');
-                const bases = Array.from(new Set(palitos.map(p => p.nombre.replace(/\s+x\d+$/, ''))));
-                return (
-                  <div className="palitos-rows">
-                    {bases.map(base => {
-                      const opciones = palitos.filter(p => p.nombre.startsWith(base));
-                      return (
-                        <div key={base} className="palitos-row">
-                          {opciones.map(producto => (
-                            <button key={producto.id} className="producto-btn" onClick={() => agregarAlCarrito(producto)}>
-                              <div>{producto.nombre}</div>
-                              <div className="precio">${producto.precio}</div>
-                            </button>
-                          ))}
-                        </div>
-                      );
-                    })}
-                  </div>
-                );
-              })() : productos.filter(p => p.categoria === categoriaActiva).map(producto => (
-                <button key={producto.id} className="producto-btn" onClick={() => agregarAlCarrito(producto)}>
-                  <div>{producto.nombre}</div>
-                  <div className="precio">${producto.precio}</div>
-                </button>
-              ))}
-            </div>
+            {categoriaActiva === 'PALITOS' ? (() => {
+              const palitos = productos.filter(p => p.categoria === 'PALITOS');
+              const bases = Array.from(new Set(palitos.map(p => p.nombre.replace(/\s+x\s*\d+$/, ''))));
+              return (
+                <div className="palitos-rows">
+                  {bases.map(base => {
+                    const opciones = palitos.filter(p => p.nombre.startsWith(base));
+                    return (
+                      <div key={base} className="palitos-row">
+                        {opciones.map(producto => (
+                          <button key={producto.id} className="producto-btn" onClick={() => agregarAlCarrito(producto)}>
+                            <div>{producto.nombre}</div>
+                            <div className="precio">${producto.precio}</div>
+                          </button>
+                        ))}
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })() : (
+              <div className="productos-grid">
+                {productos.filter(p => p.categoria === categoriaActiva).map(producto => (
+                  <button key={producto.id} className="producto-btn" onClick={() => agregarAlCarrito(producto)}>
+                    <div>{producto.nombre}</div>
+                    <div className="precio">${producto.precio}</div>
+                  </button>
+                ))}
+              </div>
+            )}
           </>
         )}
       </div>
