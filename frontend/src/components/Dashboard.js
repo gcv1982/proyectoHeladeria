@@ -64,7 +64,7 @@ export default function Dashboard({
   return (
     <>
     <div className="dashboard-container">
-      <h2 style={{ marginBottom: '16px' }}>📊 Dashboard de Ventas</h2>
+      <h2 style={{ marginBottom: '32px' }}>📊 Dashboard de Ventas</h2>
 
       {resumenDiario && (
         <div style={{
