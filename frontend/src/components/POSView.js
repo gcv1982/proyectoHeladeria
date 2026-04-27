@@ -111,7 +111,14 @@ export default function POSView({
               );
             })() : (
               <div className="productos-grid">
-                {productos.filter(p => p.categoria === categoriaActiva).map(producto => (
+                {productos.filter(p => p.categoria === categoriaActiva).sort((a, b) => {
+                  const ultimos = ['frambuesa', 'frutilla'];
+                  const aUltimo = ultimos.some(u => a.nombre.toLowerCase().includes(u));
+                  const bUltimo = ultimos.some(u => b.nombre.toLowerCase().includes(u));
+                  if (aUltimo && !bUltimo) return 1;
+                  if (!aUltimo && bUltimo) return -1;
+                  return 0;
+                }).map(producto => (
                   <button key={producto.id} className="producto-btn" onClick={() => agregarAlCarrito(producto)}>
                     <div>{producto.nombre}</div>
                     <div className="precio">${producto.precio}</div>
