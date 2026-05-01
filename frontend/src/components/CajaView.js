@@ -59,10 +59,20 @@ export default function CajaView({
                 const fechaDesdeApertura = inicioCaja?.fecha ? fechaLocal(inicioCaja.fecha) : fechaHoy;
                 const ventasHoy = ventasDelDia.filter(v => fechaLocal(v.fecha) >= fechaDesdeApertura);
                 const medios = calcularMetricasMedios(ventasHoy);
-                return medios.lista.length > 0 ? (
+                ingresos.forEach(ing => {
+                  const metodo = ing.metodo || 'EFECTIVO';
+                  medios.resumen[metodo] = (medios.resumen[metodo] || 0) + (parseFloat(ing.monto) || 0);
+                });
+                const totalConIngresos = Object.values(medios.resumen).reduce((s, a) => s + a, 0);
+                const listaConIngresos = Object.keys(medios.resumen).map(m => ({
+                  metodo: m,
+                  monto: medios.resumen[m],
+                  porcentaje: totalConIngresos ? Math.round((medios.resumen[m] * 100) / totalConIngresos) : 0,
+                })).sort((a, b) => b.monto - a.monto);
+                return listaConIngresos.length > 0 ? (
                   <div className="resumen-medios">
                     <h4>Medios de Pago</h4>
-                    {medios.lista.map((m, idx) => (
+                    {listaConIngresos.map((m, idx) => (
                       <div key={idx} className="resumen-item">
                         <span>{m.metodo}</span>
                         <span className="monto">${m.monto.toLocaleString()}<span className="porcentaje"> {m.porcentaje}%</span></span>
