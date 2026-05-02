@@ -127,8 +127,8 @@ export const calcularResumenCaja = (inicioCaja, ventasDelDia, retiros, gastos, c
   const montoInicial = inicioCaja ? inicioCaja.montoInicial : 0;
   const hoy = new Date();
   const fechaHoy = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`;
-  const fechaDesdeApertura = inicioCaja?.fecha ? fechaLocal(inicioCaja.fecha) : fechaHoy;
-  const ventasHoy = ventasDelDia.filter(v => fechaLocal(v.fecha) >= fechaDesdeApertura);
+  const fechaApertura = inicioCaja?.fecha ? new Date(inicioCaja.fecha) : new Date();
+  const ventasHoy = ventasDelDia.filter(v => new Date(v.fecha) >= fechaApertura);
   const totalVentas = ventasHoy.reduce((sum, v) => {
     const efectivoDelVenta = v.pagos?.reduce((pSum, p) =>
       p.metodo === 'EFECTIVO' ? pSum + (parseFloat(p.monto) || 0) : pSum, 0) || 0;

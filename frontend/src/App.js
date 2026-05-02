@@ -267,10 +267,8 @@ function AppInner() {
     const resumen = calcularResumenCaja(inicioCaja, ventasDelDia, retiros, gastos, cierreTotalContado, ingresos);
     const tokenActual = localStorage.getItem('auth_token');
     const idCaja = cajaId || localStorage.getItem('cajaId');
-    const hoy = new Date();
-    const fechaHoy = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`;
-    const fechaDesdeApertura = inicioCaja?.fecha ? fechaLocal(inicioCaja.fecha) : fechaHoy;
-    const ventasHoy = ventasDelDia.filter(v => fechaLocal(v.fecha) >= fechaDesdeApertura && v.estado !== 'cancelada');
+    const fechaApertura = inicioCaja?.fecha ? new Date(inicioCaja.fecha) : new Date();
+    const ventasHoy = ventasDelDia.filter(v => new Date(v.fecha) >= fechaApertura && v.estado !== 'cancelada');
 
     if (idCaja) {
       try {
@@ -597,10 +595,9 @@ function AppInner() {
   const agregarRetiro = async () => {
     const monto = parseFloat(nuevoRetiroMonto);
     if (!monto || monto <= 0) { alert('Ingrese un monto válido para el retiro'); return; }
-    const hoyStr = (() => { const h = new Date(); return `${h.getFullYear()}-${String(h.getMonth()+1).padStart(2,'0')}-${String(h.getDate()).padStart(2,'0')}`; })();
-    const fechaDesdeApertura = inicioCaja?.fecha ? fechaLocal(inicioCaja.fecha) : hoyStr;
+    const fechaAperturaRetiro = inicioCaja?.fecha ? new Date(inicioCaja.fecha) : new Date();
     const montoDisponible = (inicioCaja ? inicioCaja.montoInicial : 0) +
-      ventasDelDia.filter(v => fechaLocal(v.fecha) >= fechaDesdeApertura).reduce((s, v) => {
+      ventasDelDia.filter(v => new Date(v.fecha) >= fechaAperturaRetiro).reduce((s, v) => {
         const ef = (v.pagos || []).reduce((ps, p) => p.metodo === 'EFECTIVO' ? ps + (parseFloat(p.monto) || 0) : ps, 0);
         return s + ef;
       }, 0) - retiros.reduce((s, r) => s + (parseFloat(r.monto) || 0), 0);
